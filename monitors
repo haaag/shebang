@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+#                        _ _
+#  _ __ ___   ___  _ __ (_) |_ ___  _ __ ___
+# | '_ ` _ \ / _ \| '_ \| | __/ _ \| '__/ __|
+# | | | | | | (_) | | | | | || (_) | |  \__ \
+# |_| |_| |_|\___/|_| |_|_|\__\___/|_|  |___/
+#
+
+# TODO:
+# [ ] Find a better way to get monitors
+# [ ] Extract keyboard logic (keyboard_preferences)
+
+function logger() {
+	set -x
+	date=$(date +"%Y-%m-%d_%H-%M-%S")
+	echo "time: $date || monitors: $monitors" >"$SCRIPT_LOG_PATH/${date}_monitors.log"
+}
+
+function x_preferences() {
+	xset b off       # disable the audible feedback
+	xset s off -dpms # prevents the screensaver from activating
+	xset s noblank   # disables the blanking functionality
+}
+
+function restore_wallpaper() {
+	nitrogen --restore &>/dev/null
+}
+
+function load_laptop_monitor() {
+	xrandr --output eDP --mode 1366x768 --output HDMI-A-0 --off
+}
+
+function load_external_monitor() {
+	xrandr --output eDP --off --output HDMI-A-0 --mode 1920x1080
+}
+
+function keyboard_preferences() {
+	setxkbmap -rules evdev -model evdev -layout us -variant altgr-intl -option caps:swapescape -option compose:ralt
+	xset r rate 300 50
+}
+
+function main() {
+	monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+
+	if [ "$monitors" -eq 1 ]; then
+		load_laptop_monitor
+	else
+		load_external_monitor
+	fi
+
+	x_preferences
+	keyboard_preferences
+	restore_wallpaper
+
+	[[ -v debug ]] && logger
+
+	exit 0
+}
+
+main
