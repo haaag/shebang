@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+#
+# Void linux
+# https://docs.voidlinux.org/xbps/index.html
+#
+# The X Binary Package System
+# Fast package manager that has been designed and implemented from scratch.
+# XBPS is managed by the Void Linux team and developed at
+# https://github.com/void-linux/xbps.
+
+program=$(basename "$0")
+
+# Colors for output formatting
+red='\033[1;31m'
+green="\e[1;32m"
+blue="\e[1;34m"
+white="\e[30;47m"
+lavender="\e[30;44m"
+cyan="\e[1;36m"
+nc="\e[0m"
+
+back_lavender="\e[30;44m"
+back_white="\e[30;47m"
+
+sudo -k
+
+title() {
+	printf "\n"
+	echo -e "${cyan}${1}${nc}"
+	printf "\n"
+}
+
+mdate() {
+	printf "\n"
+	echo -e "$back_lavender xbps ${nc} ${back_white} helper $nc"
+}
+
+update() {
+	printf "\n"
+	printf "${blue}%s${nc}\n" "Syncing repo..."
+	printf "\n"
+	sudo xbps-install -Su
+}
+
+install() {
+	printf "\n${cyan}%s %s${nc}\n\n" "Installing" "$@"
+	sudo xbps-install -Su "$@"
+}
+
+install_menu() {
+	query="${1-""}"
+	local chose=$(xbps-query -Rs "$query" | fzf)
+	local selected=$(echo "$chose" | awk '{ print $2 }')
+
+	if [ -z "$selected" ]; then
+		exit 1
+	fi
+
+	install "$selected"
+}
+
+uninstall() {
+	printf "\n"
+	printf "${red}%s %s${nc}\n" "Uninstalling" "$@..."
+	printf "\n"
+	sudo xbps-remove -R "$@"
+}
+
+search() {
+	printf "\n"
+	printf "${green}%s %s${nc}\n" "Searching" "$@..."
+	printf "\n"
+	xbps-query -Rs "$@"
+}
+
+query() {
+	local selected=$(xbps-query -l | awk '{ print $2 }' | fzf --no-preview)
+
+	if [ -z "$selected" ]; then
+		exit 1
+	fi
+
+	xbps-query -f "$selected"
+}
+
+clean() {
+	title "Cleaing obsolete binary packages and orphans packages"
+	sudo xbps-remove -Oo
+}
+
+usage() {
+	echo "$program [COMMAND]"
+	echo
+	echo "Simple script for managing brightness"
+	echo
+	echo "Usage: $program <increase|decrease>"
+	echo
+	echo "commands:"
+	echo " update				Decrease brightness by 5%"
+	echo " install				Increase brightness by 5%"
+	echo " install-menu			Increase brightness by 5%"
+	echo " uninstall			Increase brightness by 5%"
+	echo " uninstall-menu		Increase brightness by 5%"
+	echo " remove				Decrease brightness by 5%"
+	echo " search				Decrease brightness by 5%"
+	echo " query				Decrease brightness by 5%"
+	echo " help					Print this Help"
+	echo
+	exit 0
+}
+
+main() {
+	case "$1" in
+	update)
+		update
+		;;
+	install)
+		shift
+		install "$@"
+		;;
+	uninstall)
+		shift
+		uninstall "$@"
+		;;
+	query)
+		shift
+		query "$@"
+		;;
+	search)
+		shift
+		search "$@"
+		;;
+	clean)
+		clean
+		;;
+	install-menu)
+		shift
+		install_menu "$@"
+		;;
+	*)
+		usage
+		;;
+	esac
+}
+
+main "$@"
