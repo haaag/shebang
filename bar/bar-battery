@@ -1,0 +1,74 @@
+#!/bin/sh
+
+# Output: [ICON  98%]
+# Output: [ICON  98% status]
+# 
+
+warn="🔴"
+icon_critical=""
+icon_empty=""
+icon_low=""
+icon_mid=""
+icon_full=""
+
+bat_charge=$(cat /sys/class/power_supply/BAT0/capacity)
+bat_status=$(cat /sys/class/power_supply/BAT0/status)
+
+# notification icons
+noti_title="Battery status"
+
+notification_critical() {
+	noti_level_critical="battery-level-10-symbolic"
+	notifyme.py --icon="$noti_level_critical" --title="$noti_title" --body="Critial level $bat_charge%" --urgency=critical
+}
+
+get_icon() {
+	icon=""
+
+	if [ "$bat_charge" -lt "20" ]; then
+		icon="$warn $icon_critical"
+	elif [ "$bat_charge" -lt "30" ]; then
+		icon="$icon_empty"
+	elif [ "$bat_charge" -lt "50" ]; then
+		icon="$icon_low"
+	elif [ "$bat_charge" -lt "90" ]; then
+		icon="$icon_mid"
+	else
+		icon="$icon_full"
+	fi
+
+	echo "$icon"
+}
+
+dwm_battery() {
+	printf "%s" "$SEP1"
+	printf "%s  %s%% %s" "$(get_icon)" "$bat_charge" "$bat_status"
+	printf "%s\n" "$SEP2"
+}
+
+dwm_battery_color() {
+	empty_color="^c#cc241d^"
+	mid_color="^c#e78a4e^"
+	full_color="^c#9ECE6A^"
+	reset_color="^d^"
+
+	printf "%s" "$SEP1"
+	if [ "$bat_charge" -lt "30" ]; then
+		printf "%s%s %s %s%% %s" "$empty_color" "$icon_empty" "$reset_color" "$bat_charge" "$bat_status"
+	elif [ "$bat_charge" -lt "50" ]; then
+		printf "%s%s %s %s%% %s" "$empty_color" "$icon_low" "$reset_color" "$bat_charge" "$bat_status"
+	elif [ "$bat_charge" -lt "90" ]; then
+		printf "%s%s %s %s%% %s" "$mid_color" "$icon_mid" "$reset_color" "$bat_charge" "$bat_status"
+	elif [ "$bat_charge" -lt "95" ]; then
+		printf "%s%s %s %s%%" "$full_color" "$icon_full" "$reset_color" "$bat_charge"
+	elif [ "$bat_charge" -gt "95" ]; then
+		printf "%s%s %s %s%%" "$full_color" "$icon_full" "$reset_color" "$bat_charge"
+	fi
+	printf "%s\n" "$SEP2"
+}
+
+if [ "$DWM_COLOR" = true ]; then
+	dwm_battery_color
+else
+	dwm_battery
+fi

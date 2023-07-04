@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# Output: [icon 55°C]
+
+# icons:     
+icon=""
+units="°C"
+target="temp1"
+
+sensors_str=$(sensors | grep "$target" | awk '{print $2}' | sed 's/+//')
+sensors_int=${sensors_str%.*}
+
+dwm_sensors() {
+	printf "%s" "$SEP1"
+	printf "%s %s%s" "$icon" "$sensors_int" "$units"
+	printf "%s" "$SEP2"
+}
+
+dwm_sensors_color() {
+	red_color="^c#fb4934^"
+	mid_color="^c#e78a4e^"
+	reset_color="^d^"
+
+	printf "%s" "$SEP1"
+	if [ "$sensors_int" -gt 70 ] && [ "$sensors_int" -le 79 ]; then
+		printf "%s%s%s %s%s" "$mid_color" "$icon" "$reset_color" "$sensors_int" "$units"
+	elif [ "$sensors_int" -ge 80 ]; then
+		printf "%s%s %s%s%s" "$red_color" "$icon" "$sensors_int" "$units" "$reset_color"
+	else
+		printf "%s %s%s" "$icon" "$sensors_int" "$units"
+	fi
+	printf "%s" "$SEP2"
+}
+
+if [ "$DWM_COLOR" = true ]; then
+	dwm_sensors_color
+else
+	dwm_sensors
+fi
