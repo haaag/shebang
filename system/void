@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+#
+# Void linux
+# https://docs.voidlinux.org/xbps/index.html
+#
+# The X Binary Package System
+# Fast package manager that has been designed and implemented from scratch.
+# XBPS is managed by the Void Linux team and developed at
+# https://github.com/void-linux/xbps.
+
+# Debug
+[[ -v debug ]] && set -x
+
+# Always ask password
+sudo -k
+
+program=$(basename "$0")
+
+# Icons
+declare -A icons
+# icons[install]=""
+icons[install]=""
+icons[search]=""
+icons[update]=""
+icons[uninstall]=""
+icons[clean]=""
+icons[query]=""
+icons[help]=""
+icons[exit]=""
+
+# Menu options
+install="${icons[install]} install"
+search="${icons[search]} search"
+update="${icons[update]} update"
+uninstall="${icons[uninstall]} uninstall"
+clean="${icons[clean]} clean"
+query="${icons[query]} query"
+help="${icons[help]} help"
+exit="${icons[exit]} exit"
+
+# Style
+bold="\e[1m"
+dim="\e[2m"
+bullet="\u2022"
+nc="\e[0m"
+
+# Colors
+blue="\e[34m"
+red="\e[91m"
+cyan="\e[36m"
+yellow="\e[93m"
+magenta="\e[35m"
+
+back_lavender="\e[30;44m"
+back_white="\e[30;47m"
+
+notification() {
+	icon="$SCRIPT_ICONS"/dialog-error-symbolic.svg
+	notify-send --icon="$icon" "$1" "$2"
+}
+
+log() {
+	from="${1:-log}"
+	shift
+	mesg="$*"
+	date=$(date +"%Y-%m-%d_%H-%M-%S")
+	log_file="${SCRIPT_LOG_PATH}/void.log"
+	echo "${date}::${program}::${from}::${mesg}" >>"$log_file"
+}
+
+title() {
+	printf "\n"
+	echo -e "${bold}${blue}Void${nc} $1"
+	printf "\n"
+}
+
+dependencies() {
+	dependencies=(fzf)
+	for cmd in "${dependencies[@]}"; do
+		if ! command -v "$cmd" >/dev/null; then
+			err_msg="'$cmd' command not found."
+			notification "$program script" "$err_msg"
+			title "$err_msg"
+			exit 1
+		fi
+	done
+}
+
+preview() {
+	for i in "$@"; do
+		version=${i##*-}
+		pkg=${i%-*}
+		echo -e " ${bullet} ${magenta}${pkg}${nc} ${dim}${version}${nc}"
+	done
+	echo
+}
+
+warning() {
+	for i in "$@"; do
+		version=${i##*-}
+		pkg=${i%-*}
+		echo -e " ${bullet}${red} ${pkg}${nc} ${dim}${version}${nc}"
+	done
+	echo
+}
+
+mdate() {
+	printf "\n"
+	echo -e "${back_lavender} xbps ${nc} ${back_white} helper $nc"
+}
+
+get_installed_pkgs() {
+	packages=$(xbps-query -s "")
+	echo "$packages"
+}
+
+get_all_pkgs() {
+	packages=$(xbps-query -Rs "*")
+	echo "$packages"
+}
+
+update() {
+	title "${blue}Syncing repositories${nc}"
+	sudo xbps-install -Su
+}
+
+install() {
+	local selected query
+	query="${1-""}"
+	selected=$(xbps-query -Rs "$query" | awk '{print $2}' | fzf \
+		--multi \
+		--prompt="Select packages> " \
+		--marker=" " \
+		--preview='xbps-query -R {}' \
+		--border-label=" Available Packages " \
+		--preview-label='[ Package Information ]' \
+		--preview-label-pos='0:bottom')
+
+	if [ -z "$selected" ]; then
+		exit 1
+	fi
+
+	title "${cyan}Install${nc}"
+	# shellcheck disable=SC2086
+	preview $selected
+	# shellcheck disable=SC2086
+	sudo xbps-install -Su $selected
+	# shellcheck disable=SC2086
+	log "${FUNCNAME[0]}" $selected
+}
+
+uninstall() {
+	local pkg_name selected query
+	query="${1-""}"
+	pkgs=$(get_installed_pkgs)
+	# pkg_name=$(get_installed_pkgs | awk '{ print $2 }')
+	pkg_name=$(echo "$pkgs" | awk '{ print $2 }')
+	selected=$(echo "$pkg_name" | fzf \
+		--multi \
+		--prompt="Select packages> " \
+		--marker=" " \
+		--preview='xbps-query -f {}' \
+		--preview-label='[ Package Information ]' \
+		--query="$query" \
+		--preview-label-pos='0:bottom')
+
+	if [ -z "$selected" ]; then
+		exit 1
+	fi
+
+	title "${red}Uninstalling packages${nc}"
+	# shellcheck disable=SC2086
+	warning $selected
+	# shellcheck disable=SC2086
+	sudo xbps-remove -R $selected
+	# shellcheck disable=SC2086
+	log "${FUNCNAME[0]}" $selected
+}
+
+search() {
+	# TODO: Improve display.
+	# [ ] pkg name and version separated
+	# [ ] pkg description new line
+	query="${1-""}"
+	title "${yellow}Search${nc}"
+	xbps-query -Rs "$query"
+}
+
+query() {
+	local selected
+	selected=$(xbps-query -l | awk '{ print $2 }' | fzf \
+		--preview='xbps-query -f {}' \
+		--preview-label='[ Package Files ]' \
+		--preview-label-pos='0:bottom')
+
+	if [ -z "$selected" ]; then
+		exit 1
+	fi
+
+	xbps-query -f "$selected"
+}
+
+clean() {
+	title "${cyan}Cleaing obsolete binary packages and orphans packages${nc}"
+	sudo xbps-remove -Oo
+}
+
+usage() {
+	echo "XBPS helper for Void Linux"
+	echo
+	echo "$program [command]"
+	echo
+	echo "Usage: $program <update|install|uninstall|search|query>"
+	echo
+	echo "commands:"
+	echo " update			Syncs repositories"
+	echo " install        	Install packages"
+	echo " uninstall      	Uninstall packages"
+	echo " search         	Search packages"
+	echo " query          	Query packages"
+	echo " help           	Show this help"
+	echo
+	exit 0
+}
+
+menu() {
+	local options
+	declare -a options
+
+	options+=("$install")
+	options+=("$search")
+	options+=("$update")
+	options+=("$uninstall")
+	options+=("$clean")
+	options+=("$query")
+	options+=("$help")
+	options+=("$exit")
+
+	command=$(printf '%s\n' "${options[@]}" | fzf \
+		--layout=reverse-list \
+		--height=45% \
+		--border=sharp \
+		--prompt="${program}> " \
+		--pointer='→' \
+		--ansi \
+		--no-preview)
+
+	(printf '%s\n' "${options[@]}" | grep -x -q "$command") &&
+		main "$(echo "$command" | cut -d' ' -f2)"
+}
+
+main() {
+	dependencies
+	case "$1" in
+	update)
+		update
+		;;
+	install)
+		shift
+		install "$@"
+		;;
+	uninstall)
+		shift
+		uninstall "$@"
+		;;
+	query)
+		shift
+		query "$@"
+		;;
+	search)
+		shift
+		search "$@"
+		;;
+	clean)
+		clean
+		;;
+	help)
+		usage
+		;;
+	exit)
+		exit 0
+		;;
+	*)
+		menu
+		;;
+	esac
+}
+
+main "$@"

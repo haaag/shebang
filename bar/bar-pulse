@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # bar icons
 low_icon=""
@@ -13,55 +13,57 @@ noti_med_icon="$icons/volume-medium.svg"
 noti_high_icon="$icons/volume-high.svg"
 noti_muted_icon="$icons/volume-muted-symbolic.svg"
 
-# colors
-reset_color="^d^"
-red_color="^c#fb4934^"
+notification() {
+	title="$1"
+	mesg="$2"
+	notify-send "$title" "$mesg"
+}
+
+check_dependencies() {
+	local dependencies program
+	program=$(basename "$0")
+	dependencies=(pamixer pulsemixer)
+
+	for cmd in "${dependencies[@]}"; do
+		if ! command -v "$cmd" >/dev/null; then
+			err_msg="'$cmd' command not found."
+			notification "$program script" "$err_msg"
+			exit 1
+		fi
+	done
+}
 
 # status
 current_vol=$(pamixer --get-volume)
 muted_vol=$(pulsemixer --get-mute)
 
+icon=""
+noti_icon=""
+
+if [ "$muted_vol" = 1 ] || [ "$current_vol" -eq 0 ]; then
+	icon="$muted_icon"
+	noti_icon="$noti_muted_icon"
+elif [ "$current_vol" -gt 0 ] && [ "$current_vol" -le 23 ]; then
+	icon="$low_icon"
+	noti_icon="$noti_low_icon"
+elif [ "$current_vol" -gt 23 ] && [ "$current_vol" -le 66 ]; then
+	icon="$mid_icon"
+	noti_icon="$noti_med_icon"
+else
+	icon="$high_icon"
+	noti_icon="$noti_high_icon"
+fi
+
 dwm_pulse() {
 	printf "%s" "$SEP1"
-	if [ "$muted_vol" = 1 ] || [ "$current_vol" -eq 0 ]; then
-		icon="$noti_muted_icon"
-		printf "%s" "$muted_icon --%"
-	elif [ "$current_vol" -gt 0 ] && [ "$current_vol" -le 33 ]; then
-		icon="$noti_low_icon"
-		printf "%s %s%%" "$low_icon" "$current_vol"
-	elif [ "$current_vol" -gt 33 ] && [ "$current_vol" -le 66 ]; then
-		icon="$noti_med_icon"
-		printf "%s %s%%" "$mid_icon" "$current_vol"
-	else
-		icon="$noti_high_icon"
-		printf "%s %s%%" "$high_icon" "$current_vol"
-	fi
-	dunstify -a "Volume" "Volume" "Volume: " -i "$icon" -h int:value:"$current_vol" -h string:x-canonical-private-synchronous:volume
+	printf "%s %s%%" "$icon" "$current_vol"
 	printf "%s\n" "$SEP2"
+	dunstify -a "Volume" "Volume" "Volume: " -i "$noti_icon" -h int:value:"$current_vol" -h string:x-canonical-private-synchronous:volume
 }
 
-dwm_pulse_color() {
-	printf "%s" "$SEP1"
-	if [ "$muted_vol" = 1 ] || [ "$current_vol" -eq 0 ]; then
-		icon="$noti_muted_icon"
-		printf "%s%s%s muted" "$red_color" "$muted_icon" "$reset_color"
-	elif [ "$current_vol" -gt 0 ] && [ "$current_vol" -le 33 ]; then
-		icon="$noti_med_icon"
-		printf " %s%%" "$current_vol"
-	elif [ "$current_vol" -gt 33 ] && [ "$current_vol" -le 66 ]; then
-		icon="$noti_med_icon"
-		printf " %s%%" "$current_vol"
-	else
-		icon="$noti_high_icon"
-		printf " %s%%" "$current_vol"
-	fi
-
-	dunstify -a "Volume" "Volume" "Volume: " -i "$icon" -h int:value:"$current_vol" -h string:x-canonical-private-synchronous:volume
-	printf "%s\n" "$SEP2"
-}
-
-if [ "$DWM_COLOR" = true ]; then
-	dwm_pulse_color
-else
+main() {
+	check_dependencies
 	dwm_pulse
-fi
+}
+
+main
