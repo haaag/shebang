@@ -4,6 +4,7 @@
 # Output: [ICON  98% status]
 # 
 
+# notification icons
 warn="🔴"
 icon_critical=""
 icon_empty=""
@@ -14,12 +15,9 @@ icon_full=""
 bat_charge=$(cat /sys/class/power_supply/BAT0/capacity)
 bat_status=$(cat /sys/class/power_supply/BAT0/status)
 
-# notification icons
-noti_title="Battery status"
-
 notification_critical() {
-	noti_level_critical="battery-level-10-symbolic"
-	notifyme.py --icon="$noti_level_critical" --title="$noti_title" --body="Critial level $bat_charge%" --urgency=critical
+	critical_icon_noti="battery-level-10-symbolic"
+	dunstify -a "Battery" "Battery" -i "$critical_icon_noti" -h int:value:"$bat_charge" -h string:x-canonical-private-synchronous:battery
 }
 
 get_icon() {

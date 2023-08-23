@@ -21,7 +21,7 @@ dwm_memory() {
 }
 
 dwm_memory_color() {
-	local red_color="^c#fb4934^"
+	local red_color="^c#ea6962^"
 	local nc="^d^"
 
 	total=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')

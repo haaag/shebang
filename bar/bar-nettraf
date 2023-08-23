@@ -2,8 +2,8 @@
 
 # Output: [ICON_DOWN  1.6MB ICON_UP  24KB]
 #                  
-icon_up=""
-icon_down=""
+icon_up=""
+icon_down=""
 
 update() {
 	sum=0
