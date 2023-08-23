@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+# bluetooth_bat=$(bluetoothctl info | grep "Battery" | awk '{print $4}' | tr -d '()')
+#      
+
+# icons
+warn="🔴"
+icon_critical=""
+icon_empty=""
+icon_low=""
+icon_mid=""
+icon_full=""
+
+is_power_on() {
+	if bluetoothctl show | grep -q "Powered: yes"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+is_device_connected() {
+	local device
+	device="$1"
+	device_info=$(bluetoothctl info "$device")
+	if echo "$device_info" | grep -q "Connected: yes"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+get_device_battery() {
+	local device
+	device="$1"
+	battery=$(bluetoothctl info "$device" | grep "Battery" | awk '{print $4}' | tr -d '()')
+	echo "$battery"
+}
+
+get_device_alias() {
+	local device
+	device="$1"
+	device_alias=$(bluetoothctl info "$device" | grep "Alias" | cut -d ' ' -f 2-)
+	echo "$device_alias"
+}
+
+get_icon() {
+	icon=""
+	bat_charge="$1"
+
+	if [ "$bat_charge" -lt "20" ]; then
+		icon="$warn $icon_critical"
+	elif [ "$bat_charge" -lt "30" ]; then
+		icon="$icon_empty"
+	elif [ "$bat_charge" -lt "50" ]; then
+		icon="$icon_low"
+	elif [ "$bat_charge" -lt "90" ]; then
+		icon="$icon_mid"
+	else
+		icon="$icon_full"
+	fi
+
+	echo "$icon"
+}
+
+devices_status() {
+	local device_counter
+	local devices_output
+
+	device_counter=0
+	mapfile -t paired_devices < <(bluetoothctl devices | grep Device | cut -d ' ' -f 2)
+
+	for device in "${paired_devices[@]}"; do
+		if is_device_connected "$device"; then
+			device_alias=$(get_device_alias "$device")
+			battery=$(get_device_battery "$device")
+			icon=$(get_icon "$battery")
+
+			string="$device_alias $icon$battery%"
+
+			if [ $device_counter -gt 0 ]; then
+				devices_output+=", $string"
+			else
+				devices_output+=$string
+			fi
+			((device_counter++))
+		fi
+	done
+	echo "$devices_output"
+}
+
+if is_power_on; then
+	devices_connected=$(bluetoothctl info | grep -c 'Name')
+	if [ "$devices_connected" -eq 1 ]; then
+		printf "%s" "$SEP1"
+		printf "%s" "$(devices_status)"
+		printf "%s\n" "$SEP2"
+	fi
+fi
