@@ -65,6 +65,10 @@ dwm_battery_color() {
 	printf "%s\n" "$SEP2"
 }
 
+if [ "$bat_charge" -lt "15" ]; then
+	notification_critical
+fi
+
 if [ "$DWM_COLOR" = true ]; then
 	dwm_battery_color
 else
