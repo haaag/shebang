@@ -20,7 +20,7 @@ is_power_on() {
 }
 
 is_device_connected() {
-	local device
+	local device device_info
 	device="$1"
 	device_info=$(bluetoothctl info "$device")
 	if echo "$device_info" | grep -q "Connected: yes"; then
@@ -31,20 +31,21 @@ is_device_connected() {
 }
 
 get_device_battery() {
-	local device
+	local device battery
 	device="$1"
 	battery=$(bluetoothctl info "$device" | grep "Battery" | awk '{print $4}' | tr -d '()')
 	echo "$battery"
 }
 
 get_device_alias() {
-	local device
+	local device device_alias
 	device="$1"
 	device_alias=$(bluetoothctl info "$device" | grep "Alias" | cut -d ' ' -f 2-)
 	echo "$device_alias"
 }
 
-get_icon() {
+get_battery_icon() {
+	local bat_charge icon
 	icon=""
 	bat_charge="$1"
 
@@ -63,10 +64,25 @@ get_icon() {
 	echo "$icon"
 }
 
-devices_status() {
-	local device_counter
-	local devices_output
+get_device_icon() {
+	local default_icon devices device_icon_name
+	device="$1"
+	default_icon=""
 
+	device_icon_name=$(bluetoothctl info "$device" | grep "Icon" | cut -d ' ' -f 2-)
+
+	declare -A devices=(
+		["audio-headset"]=""
+	)
+	if [ -n "${devices[$device_icon_name]}" ]; then
+		echo "${devices[$device_icon_name]}"
+	else
+		echo "$default_icon"
+	fi
+}
+
+devices_status() {
+	local device_counter devices_output
 	device_counter=0
 	mapfile -t paired_devices < <(bluetoothctl devices | grep Device | cut -d ' ' -f 2)
 
@@ -74,9 +90,10 @@ devices_status() {
 		if is_device_connected "$device"; then
 			device_alias=$(get_device_alias "$device")
 			battery=$(get_device_battery "$device")
-			icon=$(get_icon "$battery")
+			bat_icon=$(get_battery_icon "$battery")
+			device_icon=$(get_device_icon "$device")
 
-			string="$device_alias $icon$battery%"
+			string="$device_icon $device_alias $bat_icon$battery%"
 
 			if [ $device_counter -gt 0 ]; then
 				devices_output+=", $string"
