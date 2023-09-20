@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+#
+# Script Name: ytmpv
+# Description: Play a video from a given URL using mpv with notifications and logging.
+# Author: @haaag
+# Version: 0.1
+#
+# Usage:
+#   $ ytmpv <URL>
+#
+# Dependencies:
+#   - mpv (Media player)
+#   - wget (For URL content retrieval)
+#
+# Note: This script checks for the presence of mpv and wget in the system.
+# If any of them is missing, it will display an error message and exit.
+#
+# The script retrieves the video title and sends a desktop notification.
+#
+# Example:
+#   $ ytmpv 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+
+set -e
+
+check_dependencies() {
+	dependencies=(mpv wget)
+	for cmd in "${dependencies[@]}"; do
+		if ! command -v "$cmd" >/dev/null; then
+			echo "$cmd command not found."
+			exit 1
+		fi
+	done
+}
+
+log() {
+	local url title program date log_file log_path
+	log_path=${SCRIPT_LOG_PATH:-$HOME/.cache}
+	url="$1"
+	title="$2"
+	program=$(basename "$0")
+	date=$(date +"%Y-%m-%d %H:%M:%S")
+	log_file="${log_path}/${program}.log"
+	echo "${date} ${program} --- : ${title}: ${url}" >>"$log_file"
+}
+
+notification() {
+	local title mesg
+	title=$(basename "$0")
+	mesg="Launching: $1"
+
+	notify-send "$title" "$mesg"
+}
+
+open_mpv() {
+	setsid mpv --input-ipc-server=/tmp/mpvsoc"$(date +%s)" -quiet "$1" >/dev/null 2>&1 &
+}
+
+main() {
+	local url video_title
+	[[ -z $1 ]] && echo "You must enter a URL." && exit
+	url="$1"
+
+	if ! wget -q --spider "$url"; then
+		# '--spider' Check the availability of the URL without downloading its content
+		echo "Failed to retrieve the URL: $url"
+		exit 1
+	fi
+
+	video_title=$(wget -qO- "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
+
+	if [ -z "$video_title" ]; then
+		video_title="err: Failed to extract video title."
+	fi
+
+	notification "$video_title"
+	log "$url" "$video_title"
+	open_mpv "$url"
+}
+
+main "$1"
