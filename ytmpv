@@ -11,6 +11,7 @@
 # Dependencies:
 #   - mpv (Media player)
 #   - wget (For URL content retrieval)
+#   - setsid (For running mpv in a new session)
 #
 # Note: This script checks for the presence of mpv and wget in the system.
 # If any of them is missing, it will display an error message and exit.
@@ -21,6 +22,8 @@
 #   $ ytmpv 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 
 set -e
+
+[[ -v debug ]] && set -x
 
 check_dependencies() {
 	dependencies=(mpv wget)
@@ -72,9 +75,9 @@ main() {
 		video_title="err: Failed to extract video title."
 	fi
 
-	notification "$video_title"
 	log "$url" "$video_title"
 	open_mpv "$url"
+	notification "$video_title"
 }
 
 main "$1"
