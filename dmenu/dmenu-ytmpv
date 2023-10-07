@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# Simple script for open youtube's url in mpv
+
+set -e
+
+program=$(basename "$0")
+
+if ! command -v "dmenu" >/dev/null; then
+	echo "dmenu command not found."
+	exit 1
+fi
+
+notification() {
+	local title mesg
+	title="$1"
+	mesg="$2"
+	notify-send "$title" "$mesg"
+}
+
+show_and_exit() {
+	mesg="${program}: No URL provided"
+	notification "$mesg"
+	exit 1
+}
+
+url=$(dmenu -p 'youtube>' </dev/null)
+
+[ -z "$url" ] && show_and_exit
+
+ytmpv "$url"
