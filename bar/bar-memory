@@ -4,7 +4,8 @@
 
 #           
 # 
-icon=""
+# icon=""
+icon=""
 
 # The bash shell arithmetic expression ((...)) can't handle floating point.
 [ -z "$(which bc)" ] && echo "bc command not found." && exit 1

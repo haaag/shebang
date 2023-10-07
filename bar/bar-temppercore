@@ -2,8 +2,8 @@
 
 # Output: [icon 55°C]
 
-# icons:     
-icon=""
+# icons:      
+icon=""
 units="°C"
 target="temp1"
 
