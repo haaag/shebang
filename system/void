@@ -8,11 +8,16 @@
 # XBPS is managed by the Void Linux team and developed at
 # https://github.com/void-linux/xbps.
 
+set -o errexit
+set -o pipefail
+
 # Debug
 [[ -v debug ]] && set -x
 
 # Always ask password
 sudo -k
+
+# xbps-query -p install-date -s '' | sort -k2
 
 program=$(basename "$0")
 
@@ -59,13 +64,13 @@ notification() {
 	notify-send --icon="$icon" "$1" "$2"
 }
 
-log() {
-	from="${1:-log}"
+logger() {
+	from="${1:-LOG}"
 	shift
 	mesg="$*"
-	date=$(date +"%Y-%m-%d_%H-%M-%S")
+	date=$(date +"%Y-%m-%d %H:%M:%S")
 	log_file="${SCRIPT_LOG_PATH}/void.log"
-	echo "${date}::${program}::${from}::${mesg}" >>"$log_file"
+	echo "${date} ${program} --- : ${from}: ${mesg}" >>"$log_file"
 }
 
 title() {
@@ -126,8 +131,7 @@ update() {
 
 install() {
 	local selected query
-	query="${1-""}"
-	selected=$(xbps-query -Rs "$query" | awk '{print $2}' | fzf \
+	query="${1-""}" selected=$(xbps-query -Rs "$query" | awk '{print $2}' | fzf \
 		--multi \
 		--prompt="Select packages> " \
 		--marker=" " \
@@ -146,7 +150,7 @@ install() {
 	# shellcheck disable=SC2086
 	sudo xbps-install -Su $selected
 	# shellcheck disable=SC2086
-	log "${FUNCNAME[0]}" $selected
+	logger "INSTALL		" $selected
 }
 
 uninstall() {
@@ -174,7 +178,7 @@ uninstall() {
 	# shellcheck disable=SC2086
 	sudo xbps-remove -R $selected
 	# shellcheck disable=SC2086
-	log "${FUNCNAME[0]}" $selected
+	logger "UNINSTALL	" $selected
 }
 
 search() {
@@ -201,8 +205,13 @@ query() {
 }
 
 clean() {
-	title "${cyan}Cleaing obsolete binary packages and orphans packages${nc}"
+	title "${cyan}Cleaning obsolete binary packages and orphans packages${nc}"
 	sudo xbps-remove -Oo
+}
+
+show_log() {
+	log_file="${SCRIPT_LOG_PATH}/void.log"
+	cat "$log_file"
 }
 
 usage() {
@@ -274,6 +283,9 @@ main() {
 	clean)
 		clean
 		;;
+	log)
+		show_log
+		;;
 	help)
 		usage
 		;;
@@ -285,5 +297,9 @@ main() {
 		;;
 	esac
 }
+
+if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+	usage
+fi
 
 main "$@"
