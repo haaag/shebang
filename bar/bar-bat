@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from enum import Enum, auto
+from typing import ClassVar, List, Tuple
+
+BAT_CRITICAL_CAP = 10
+BAT = os.environ.get("BATTERY", "BAT0")
+POWER_SUPPLY_STATUS = f"/sys/class/power_supply/{BAT}/status"
+POWER_SUPPLY_CAPACITY = f"/sys/class/power_supply/{BAT}/capacity"
+ICON_BAT_CRITICAL = "battery-level-10-symbolic"
+SEP1 = os.environ.get("SEP1", "")
+SEP2 = os.environ.get("SEP2", "")
+
+IconsMap = List[Tuple[int, int, str]]
+
+
+def read_line(file: str) -> str:
+    try:
+        with open(file, "r") as f:
+            return f.readline().strip()
+    except FileNotFoundError as err:
+        raise FileNotFoundError(f"{file=} not found.") from err
+
+
+class BatStatus(Enum):
+    Charging = auto()
+    Discharging = auto()
+    Full = auto()
+    Unknown = auto()
+
+
+@dataclass
+class Notification:
+    @staticmethod
+    def send(title: str, body: str, icon: str, bin: str) -> None:
+        args = [
+            bin,
+            "--app-name=Battery",
+            f"--icon={icon}",
+            "--urgency=normal",
+            "--expire-time=5000",
+            title,
+            body,
+        ]
+        run(args)
+
+
+def run(args: List[str]) -> int:
+    try:
+        completed_process = subprocess.run(
+            args,
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            # stderr=subprocess.PIPE,
+            text=True,
+            shell=False,
+        )
+        return completed_process.returncode
+    except subprocess.SubprocessError as e:
+        raise e
+
+
+ICONS_DISCHARGING: IconsMap = [
+    (1, 10, ""),
+    (11, 20, ""),
+    (21, 30, ""),
+    (31, 40, ""),
+    (41, 50, ""),
+    (51, 60, ""),
+    (61, 70, ""),
+    (71, 80, ""),
+    (81, 90, ""),
+    (91, 94, ""),
+    (95, 100, ""),
+]
+ICONS_CHARGING: IconsMap = [
+    (1, 14, ""),
+    (15, 29, ""),
+    (30, 44, ""),
+    (45, 59, ""),
+    (60, 74, ""),
+    (75, 89, ""),
+    (90, 100, ""),
+]
+ICONS_UNKNOWN: IconsMap = [(1, 100, "")]
+ICONS_FULL: IconsMap = [(1, 100, "")]
+ICONS_MAPS: dict[BatStatus, IconsMap] = {
+    BatStatus.Charging: ICONS_CHARGING,
+    BatStatus.Discharging: ICONS_DISCHARGING,
+    BatStatus.Full: ICONS_FULL,
+}
+
+
+class Icons:
+    @staticmethod
+    def get(status: BatStatus) -> IconsMap:
+        return ICONS_MAPS.get(status, ICONS_UNKNOWN)
+
+
+@dataclass
+class Battery:
+    status_str: str
+    capacity: int
+
+    STATUS: ClassVar[dict[str, BatStatus]] = {
+        "Charging": BatStatus.Charging,
+        "Discharging": BatStatus.Discharging,
+        "Full": BatStatus.Full,
+        "Unknown": BatStatus.Unknown,
+    }
+
+    @property
+    def status(self) -> BatStatus:
+        return self.STATUS.get(self.status_str, BatStatus.Unknown)
+
+    def get_icon_for_capacity(self) -> str:
+        for range_start, range_end, icon in Icons.get(self.status):
+            if range_start <= self.capacity <= range_end:
+                return icon
+        return ICONS_UNKNOWN[0][2]
+
+    def print_pretty_status(self) -> None:
+        icon = self.get_icon_for_capacity()
+        print(f"{SEP1}{icon} {self.capacity}% {self.status_str}{SEP2}")
+
+
+def get_battery() -> Battery:
+    BAT_STATUS = read_line(POWER_SUPPLY_STATUS)
+    BAT_CAPACITY = int(read_line(POWER_SUPPLY_CAPACITY))
+    return Battery(BAT_STATUS, BAT_CAPACITY)
+
+
+def main() -> int:
+    battery = get_battery()
+    battery.print_pretty_status()
+
+    if battery.capacity <= BAT_CRITICAL_CAP:
+        Notification.send(
+            title="Battery",
+            body=f"Capacity critical: {battery.capacity}%",
+            icon=ICON_BAT_CRITICAL,
+            bin="notify-send",
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
