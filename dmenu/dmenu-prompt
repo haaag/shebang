@@ -1,0 +1,44 @@
+#!/bin/env bash
+#
+# Simple bash script that provides several
+# options for system management and control.
+#
+
+program=$(basename "$0")
+dependencies=(dmenu dwm slock)
+
+for cmd in "${dependencies[@]}"; do
+	if ! command -v "$cmd" >/dev/null; then
+		err "'$cmd' command not found."
+	fi
+done
+
+err() {
+	local msg
+	msg="$1"
+	notify-send -i 'dialog-error' "$program" "$msg"
+	echo "${program}: $*" >&2
+	exit 1
+}
+
+logout_dwm() {
+	local exit_wm
+	exit_wm="$WM_EXIT_SIGNAL"
+	touch "$exit_wm"
+	killall dwm
+}
+
+PROMPT=" Lock| Suspend| Hibernate| Logout| Reboot"
+PROMPT+="| Shutdown | Restart-DW| DisplayOff"
+CHOSE=$(echo -e "$PROMPT" | sed 's/|/\n/g' | dmenu -h 21 -i -p "System>")
+
+case "$CHOSE" in
+*Lock) slock ;;
+*Suspend) sudo zzz ;;
+*Hibernate) sudo ZZZ ;;
+*Logout) logout_dwm ;;
+*RestartWM) killall dwm ;;
+*Reboot) sudo reboot ;;
+*Shutdown) sudo poweroff ;;
+*DisplayOff) xset dpms force off ;;
+esac
