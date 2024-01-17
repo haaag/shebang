@@ -19,49 +19,44 @@
 # The script retrieves the video title and sends a desktop notification.
 #
 # Example:
-#   $ ytmpv 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+#   $ ytmpv "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
 [[ -v debug ]] && set -x
 
+# shellcheck disable=SC1091
+[ -f "$HOME/.config/shell/utils.sh" ] && source "$HOME/.config/shell/utils.sh"
+
+program=$(basename "$0")
+dependencies=(mpv wget)
+
 check_dependencies() {
-	dependencies=(mpv wget)
 	for cmd in "${dependencies[@]}"; do
 		if ! command -v "$cmd" >/dev/null; then
-			echo "$cmd command not found."
+			echo "$program: dependency '$cmd' not found"
 			exit 1
 		fi
 	done
 }
 
-log() {
-	local url title program date log_file log_path
-	log_path=${SCRIPT_LOG_PATH:-$HOME/.cache}
-	url="$1"
-	title="$2"
-	program=$(basename "$0")
-	date=$(date +"%Y-%m-%d %H:%M:%S")
-	log_file="${log_path}/${program}.log"
-	echo "${date} ${program} --- : ${title}: ${url}" >>"$log_file"
-}
-
 notification() {
-	local title mesg
-	title=$(basename "$0")
-	mesg="Launching: $1"
-
-	notify-send "$title" "$mesg"
+	local mesg="Launching: $1"
+	notify-send "$program" "$mesg"
 }
 
 open_mpv() {
-	setsid mpv --input-ipc-server=/tmp/mpvsoc"$(date +%s)" -quiet "$1" >/dev/null 2>&1 &
+	setsid mpv --input-ipc-server="${MPVSOCKET:-/tmp/mpvsocket}" -quiet "$1" >/dev/null 2>&1 &
 }
 
 main() {
 	local url video_title
-	[[ -z $1 ]] && echo "You must enter a URL." && exit
+	[[ -z $1 ]] && echo "$program: You must enter a URL." && exit
 	url="$1"
+
+	check_dependencies
 
 	if ! wget -q --spider "$url"; then
 		# '--spider' Check the availability of the URL without downloading its content
@@ -75,7 +70,7 @@ main() {
 		video_title="err: Failed to extract video title."
 	fi
 
-	log "$url" "$video_title"
+	void_logger "$program" "$video_title: $url"
 	open_mpv "$url"
 	notification "$video_title"
 }

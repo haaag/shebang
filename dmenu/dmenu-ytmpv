@@ -24,7 +24,7 @@ show_and_exit() {
 	exit 1
 }
 
-url=$(dmenu -p 'youtube>' </dev/null)
+url=$(dmenu -h 22 -p 'youtube>' </dev/null)
 
 [ -z "$url" ] && show_and_exit
 
