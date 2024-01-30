@@ -2,7 +2,7 @@
 
 # Output: "[ICON Fri DD-MM]"
 #   
-icon=""
+icon=""
 
 date_var=$(date "+%a %d-%m")
 
