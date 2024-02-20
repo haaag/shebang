@@ -32,6 +32,7 @@ set -o nounset
 
 program=$(basename "$0")
 dependencies=(mpv wget)
+args="--hsts-file=$XDG_CACHE_HOME/wget-hsts"
 
 check_dependencies() {
 	for cmd in "${dependencies[@]}"; do
@@ -58,13 +59,13 @@ main() {
 
 	check_dependencies
 
-	if ! wget -q --spider "$url"; then
+	if ! wget "$args" -q --spider "$url"; then
 		# '--spider' Check the availability of the URL without downloading its content
 		echo "Failed to retrieve the URL: $url"
 		exit 1
 	fi
 
-	video_title=$(wget -qO- "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
+	video_title=$(wget "$args" -qO- "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
 
 	if [ -z "$video_title" ]; then
 		video_title="err: Failed to extract video title."

@@ -5,6 +5,7 @@
 
 prog=$(basename "$0")
 deps=(rg wget)
+args="--hsts-file=${XDG_CACHE_HOME:-~/.cache}/wget-hsts"
 
 err_and_exit() {
 	local msg="$1"
@@ -20,7 +21,7 @@ for dep in "${deps[@]}"; do
 	fi
 done
 
-channel_id=$(wget -qO- "$1" | rg -oP 'href="https://www\.youtube\.com/feeds/videos\.xml\?channel_id=\K[^"]+')
+channel_id=$(wget "$args" -qO- "$1" | rg -oP 'href="https://www\.youtube\.com/feeds/videos\.xml\?channel_id=\K[^"]+')
 
 if [[ -z "$channel_id" ]]; then
 	err_and_exit "no channel ID found in the provided URL"
