@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+# simple script to load dunst themes.
+# requires: dunst, dunstify
+
+PROG=$(basename "$0")
+ROOT="$XDG_CONFIG_HOME"/dunst
+THEMES="$ROOT"/themes
+SETTINGS="$ROOT"/dunst.settings
+DUNSTRC="$ROOT"/dunstrc
+LIST=("$THEMES"/*)
+HEADER="# DO NOT EDIT! This file will be overwritten by $PROG.
+# Edit the file '$SETTINGS' instead.
+# See '$PROG --help' for more information.
+
+"
+
+usage() {
+	echo "usage: $PROG [-s --set THEME] [-l --list]"
+}
+
+log_err() {
+	printf "%s: %s\n" "$PROG" "$*"
+	exit 1
+}
+
+check_deps() {
+	local deps=(dunstify dunst)
+	for cmd in "${deps[@]}"; do
+		if ! command -v "$cmd" >/dev/null; then
+			log_err "dunst not found"
+		fi
+	done
+}
+
+check_files() {
+	if [ ! -f "$SETTINGS" ]; then
+		log_err "settings file '$SETTINGS' not found"
+	fi
+}
+
+notify() {
+	local msg="$1"
+	export DISPLAY=":0"
+	dunstify -i "messagebox_info" "$PROG" "$msg"
+}
+
+kill_dunst() {
+	pkill dunst >/dev/null
+	code="$?"
+	if [ "$code" -eq 0 ]; then
+		notify "configuration reloaded"
+	fi
+}
+
+get_theme() {
+	local name base
+	name="$1"
+	result=""
+
+	for theme in "${LIST[@]}"; do
+		base=$(basename "$theme")
+		if [ "$base" = "$name" ]; then
+			result="$theme"
+		fi
+	done
+
+	echo "$result"
+}
+
+set_theme() {
+	local theme
+	theme=$(get_theme "$1")
+
+	if [ -z "$theme" ]; then
+		log_err "theme '$1' not found"
+	fi
+
+	create_theme "$theme"
+}
+
+create_theme() {
+	local theme="$1"
+
+	rm "$DUNSTRC"
+
+	{
+		echo "$HEADER"
+		cat "$SETTINGS"
+		cat "$theme"
+		printf "\n%s" "# vim: ft=cfg"
+	} >>"$DUNSTRC"
+
+	kill_dunst
+}
+
+list_themes() {
+	usage
+	echo
+	echo "available themes:"
+	for theme in "${LIST[@]}"; do
+		echo "  - $(basename "$theme")"
+	done
+	exit 0
+}
+
+main() {
+	check_deps
+	check_files
+
+	local option theme
+	option="$1"
+	theme="$2"
+
+	case "$option" in
+	-s | --set) set_theme "$2" ;;
+	-l | --list) list_themes ;;
+	*) usage ;;
+	esac
+}
+
+main "$@"
