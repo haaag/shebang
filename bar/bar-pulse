@@ -7,11 +7,10 @@ high_icon=""
 muted_icon=""
 
 # notification icons
-icons="$HOME/.scripts/icons/"
-noti_low_icon="$icons/volume-low.svg"
-noti_med_icon="$icons/volume-medium.svg"
-noti_high_icon="$icons/volume-high.svg"
-noti_muted_icon="$icons/volume-muted-symbolic.svg"
+noti_low_icon="audio-volume-low-symbolic"
+noti_med_icon="audio-volume-medium-symbolic"
+noti_high_icon="audio-volume-high-symbolic"
+noti_muted_icon="audio-volume-muted-symbolic"
 
 notification() {
 	title="$1"
