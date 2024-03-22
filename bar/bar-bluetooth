@@ -3,6 +3,8 @@
 # bluetooth_bat=$(bluetoothctl info | grep "Battery" | awk '{print $4}' | tr -d '()')
 #      
 
+PROG=$(basename "$0")
+
 # icons
 warn="🔴"
 icon_critical=""
@@ -10,6 +12,23 @@ icon_empty=""
 icon_low=""
 icon_mid=""
 icon_full=""
+
+notify() {
+	local msg urgency
+	msg="$1"
+	urgency="$2"
+	export DISPLAY=":0"
+	dunstify -h string:x-dunst-stack-tag:bluetooth -i "battery-low-symbolic" -u "$urgency" "$PROG" "$msg"
+}
+
+check_battery() {
+	local device_alias battery
+	device_alias="$1"
+	battery="$2"
+	if [ "$battery" -le 10 ]; then
+		notify "$device_alias battery is low ($battery%)" "critical"
+	fi
+}
 
 is_power_on() {
 	if bluetoothctl show | grep -q "Powered: yes"; then
@@ -50,7 +69,7 @@ get_battery_icon() {
 	bat_charge="$1"
 
 	if [ "$bat_charge" -lt "20" ]; then
-		icon="$warn $icon_critical"
+		icon="$warn$icon_critical"
 	elif [ "$bat_charge" -lt "30" ]; then
 		icon="$icon_empty"
 	elif [ "$bat_charge" -lt "50" ]; then
@@ -90,6 +109,8 @@ devices_status() {
 		if is_device_connected "$device"; then
 			device_alias=$(get_device_alias "$device")
 			battery=$(get_device_battery "$device")
+			check_battery "$device_alias" "$battery"
+
 			bat_icon=$(get_battery_icon "$battery")
 			device_icon=$(get_device_icon "$device")
 
