@@ -3,14 +3,29 @@
 # Output: [icon 55°C]
 
 # icons:      
+prog=$(basename "$0")
 icon=""
 units="°C"
 target="temp1"
+warn_icon="🔥"
+warning=75
 
 sensors_str=$(sensors | grep "$target" | awk '{print $2}' | sed 's/+//')
 sensors_int=${sensors_str%.*}
 
+notify() {
+	msg="$1"
+	urgency="$2"
+	export DISPLAY=":0"
+	dunstify -h string:x-dunst-stack-tag:temppercore -i "cpu" -u "$urgency" "$prog" "$msg"
+}
+
 dwm_sensors() {
+	if [ "$sensors_int" -ge "$warning" ]; then
+		icon="$warn_icon"
+		notify "$icon$sensors_int$units is too high" "critical"
+	fi
+
 	printf "%s" "$SEP1"
 	printf "%s %s%s" "$icon" "$sensors_int" "$units"
 	printf "%s" "$SEP2"
