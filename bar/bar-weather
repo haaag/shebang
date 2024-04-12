@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Load envs
-[ -f "$PRIVATE_ENV" ] && . "$PRIVATE_ENV"
+# load envs
+# shellcheck source=/dev/null
+[ -f "$PRIVATE_ROOT"/openweather ] && . "$PRIVATE_ROOT"/openweather
 
 # Api
 key="$OPEN_WEATHERMAP_KEY"
@@ -29,22 +30,19 @@ check_dependencies() {
 
 get_icon() {
 	case $1 in
-	01d) icon="" ;;
-	01n) icon="" ;;
-	02d) icon="" ;;
-	02n) icon="" ;;
-	03*) icon="" ;;
+	01d) icon="" ;;
+	01n) icon="" ;;
+	02d) icon="" ;;
+	02n) icon="" ;;
+	03*) icon="" ;;
 	04*) icon="" ;;
-	09d) icon="" ;;
-	09n) icon="" ;;
-	10d) icon="" ;;
-	10n) icon="" ;;
-	11d) icon="" ;;
-	11n) icon="" ;;
-	13d) icon="" ;;
-	13n) icon="" ;;
-	50d) icon="" ;;
-	50n) icon="" ;;
+	09*) icon="" ;;
+	10d) icon="" ;;
+	10n) icon="" ;;
+	11d) icon="" ;;
+	11n) icon="" ;;
+	13*) icon="" ;;
+	50*) icon="" ;;
 	*) icon="" ;;
 	esac
 
@@ -82,11 +80,12 @@ send_notification() {
 notification() {
 	date=$(date +"%a, %H:%M")
 	icon="${icons}${2}.png"
-	notify-send -i "$icon" "Wather $date" "$1"
+	notify-send -i "$icon" "Weather $date" "$1"
 }
 
 dwm_weather() {
 	get_weather
+  echo ">>$weather_icon"
 	icon=$(get_icon "$weather_icon")
 	desc=$(echo "$weather" | jq -r ".weather[0].description")
 	temp=$(echo "$weather" | jq ".main.temp" | cut -d "." -f 1)

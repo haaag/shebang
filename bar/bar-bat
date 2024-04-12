@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, List, Tuple
+from pathlib import Path
 
 BAT_CRITICAL_CAP = 10
 BAT = os.environ.get("BATTERY", "BAT0")
@@ -14,6 +15,7 @@ POWER_SUPPLY_CAPACITY = f"/sys/class/power_supply/{BAT}/capacity"
 ICON_BAT_CRITICAL = "battery-level-10-symbolic"
 SEP1 = os.environ.get("SEP1", "")
 SEP2 = os.environ.get("SEP2", "")
+ALARM = ["alarm", "1s", "critical battery level"]
 
 IconsMap = List[Tuple[int, int, str]]
 
@@ -39,14 +41,21 @@ class Notification:
     def send(title: str, body: str, icon: str, bin: str) -> None:
         args = [
             bin,
-            "--app-name=Battery",
             f"--icon={icon}",
             "--urgency=critical",
-            "--expire-time=5000",
             title,
             body,
         ]
         run(args)
+
+    @staticmethod
+    def alarm() -> None:
+        alarm_sent = Path("/tmp/alarm-sent")
+        if alarm_sent.exists():
+            return
+
+        alarm_sent.touch()
+        run(ALARM)
 
 
 def run(args: List[str]) -> int:
@@ -127,6 +136,9 @@ class Battery:
         icon = self.get_icon_for_capacity()
         print(f"{SEP1}{icon} {self.capacity}% {self.status_str}{SEP2}")
 
+    def is_charging(self) -> bool:
+        return self.status == BatStatus.Charging
+
 
 def get_battery() -> Battery:
     BAT_STATUS = read_line(POWER_SUPPLY_STATUS)
@@ -138,13 +150,14 @@ def main() -> int:
     battery = get_battery()
     battery.print_pretty_status()
 
-    if battery.capacity <= BAT_CRITICAL_CAP:
+    if battery.capacity <= BAT_CRITICAL_CAP and not battery.is_charging():
         Notification.send(
+            bin="dunstify",
             title="Battery",
             body=f"Capacity critical: {battery.capacity}%",
             icon=ICON_BAT_CRITICAL,
-            bin="notify-send",
         )
+        Notification.alarm()
     return 0
 
 

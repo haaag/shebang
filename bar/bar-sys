@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# Simple systray for dwmblocks
+
+get_interface() {
+	local ether="eno1"
+	local wlan="wlp2s0"
+	declare -A interfaces
+	interfaces["$ether"]=""
+	interfaces["$wlan"]=""
+
+	local exclude="loopback"
+	local status=$(nmcli device status | grep "$ether\|$wlan")
+	local count=$(echo "$status" | grep -c "connected")
+
+	if [[ "$count" -lt 1 ]]; then
+		printf "%s" ""
+	elif [[ "$count" -eq 1 ]]; then
+		local active=$(echo "$status" | grep "connected" | grep -v "$exclude" | awk '{print $1}')
+		printf "%s" "${interfaces[$active]}"
+	else
+		printf "%s" "🔴${interfaces[*]}"
+	fi
+}
+
+get_icons() {
+	icons=(                                    )
+}
+
+is_bluetooth_on() {
+	if bluetoothctl show | grep -q "Powered: yes"; then
+		printf "%s" ""
+	fi
+}
+
+is_running() {
+	local cmd="$1"
+	local icon="$2"
+	local disable="$3"
+
+	if ! pgrep -f "$cmd" >/dev/null; then
+		printf "%s" "$disable"
+	else
+		printf "%s" "$icon"
+	fi
+}
+
+main() {
+	declare -A programs
+	programs["mpv"]="" # 
+	programs["newsboat"]=""
+	programs["nvim"]=""
+	programs["signal-desktop"]=""
+	programs["telegram"]="" # ""
+	programs["tidal-hifi"]=""
+	programs["transmission-daemon"]=""
+	programs["xbps-install"]=""
+  programs["ytlocal"]=""
+
+	mapfile -t icons < <(get_interface)
+	icons+=("$(is_bluetooth_on)")
+
+	for prog in "${!programs[@]}"; do
+		icon=${programs[$prog]}
+		icons+=("$(is_running "$prog" "$icon")")
+	done
+
+	# Maybe implement option to display another icon if not running
+	icons+=("$(is_running "dunst" "" "")")
+
+	printf "%s" "$SEP1"
+	for icon in "${icons[@]}"; do
+		[[ -n "$icon" ]] && printf "%s " "$icon"
+	done
+	printf "%s\n" "$SEP2"
+}
+
+main

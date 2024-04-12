@@ -2,10 +2,10 @@
 
 # Output: [icon 1.9Gi 25%]
 
-#        
+#      
 # 
-# icon=""
-icon=""
+# icon=""
+icon=""
 
 # The bash shell arithmetic expression ((...)) can't handle floating point.
 [ -z "$(which bc)" ] && echo "bc command not found." && exit 1
@@ -46,5 +46,4 @@ if [ "$DWM_COLOR" = true ]; then
 	dwm_memory_color
 else
 	dwm_memory
-	# simple_dwm_memory
 fi

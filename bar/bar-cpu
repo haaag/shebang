@@ -3,7 +3,8 @@
 # Output: [ICON  10%]
 
 # icon=""
-icon=""
+# icon=""
+icon=""
 
 dwm_cpu_old() {
 	cpu=$(top -bn1 | grep Cpu | awk '{print $2}')

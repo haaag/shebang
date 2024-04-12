@@ -8,7 +8,7 @@ icon=""
 units="°C"
 target="temp1"
 warn_icon="🔥"
-warning=75
+warning=80
 
 sensors_str=$(sensors | grep "$target" | awk '{print $2}' | sed 's/+//')
 sensors_int=${sensors_str%.*}

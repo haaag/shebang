@@ -19,7 +19,7 @@ bat_status=$(cat /sys/class/power_supply/BAT0/status)
 
 notification_critical() {
 	critical_icon_noti="battery-level-10-symbolic"
-	dunstify -a "Battery" "Battery" -i "$critical_icon_noti" -h int:value:"$bat_charge" -h string:x-canonical-private-synchronous:battery
+	dunstify --urgency=critical -a "Battery" "Battery" "Battery critical: " -i "$critical_icon_noti" -h int:value:"$bat_charge" -h string:x-canonical-private-synchronous:battery
 }
 
 get_icon() {
@@ -66,7 +66,6 @@ dwm_battery_color() {
 	fi
 	printf "%s\n" "$SEP2"
 }
-
 if [ "$bat_charge" -lt "15" ]; then
 	notification_critical
 fi
