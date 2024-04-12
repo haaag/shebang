@@ -16,7 +16,7 @@ HEADER="# DO NOT EDIT! This file will be overwritten by $PROG.
 "
 
 usage() {
-	echo "usage: $PROG [-s --set THEME] [-l --list]"
+	echo "usage: $PROG [-s --set THEME] [-l --list] [-r --reload]"
 }
 
 log_err() {
@@ -115,6 +115,7 @@ main() {
 	case "$option" in
 	-s | --set) set_theme "$2" ;;
 	-l | --list) list_themes ;;
+	-r | --reload) kill_dunst ;;
 	*) usage ;;
 	esac
 }
