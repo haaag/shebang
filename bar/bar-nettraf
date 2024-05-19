@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Output: [ICON_DOWN  1.6MB ICON_UP  24KB]
-#                  
+#                      
 icon_up=""
 icon_down=""
 
@@ -12,7 +12,7 @@ update() {
 		sum=$((sum + i))
 	done
 	cache=/tmp/${1##*/}
-	[ -f "$cache" ] && read -r old <"$cache" || old=0
+	[[ -f "$cache" ]] && read -r old <"$cache" || old=0
 	printf %d\\n "$sum" >"$cache"
 	printf %d\\n $((sum - old))
 }
@@ -20,6 +20,6 @@ update() {
 rx=$(update /sys/class/net/[ew]*/statistics/rx_bytes)
 tx=$(update /sys/class/net/[ew]*/statistics/tx_bytes)
 
-printf "[%s  %4sB %s %4sB]\\n" "$icon_down" "$(numfmt --to=iec "$rx")" "$icon_up" "$(numfmt --to=iec "$tx")"
+printf "$SEP1%s  %4sB %s %4sB$SEP2\\n" "$icon_down" "$(numfmt --to=iec "$rx")" "$icon_up" "$(numfmt --to=iec "$tx")"
 
 # printf "🔻%4sB 🔺%4sB\\n" $(numfmt --to=iec $rx $tx)

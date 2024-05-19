@@ -2,14 +2,12 @@
 
 # Output: [ICON  10%]
 
-# icon=""
-# icon=""
-icon=""
+ICON=""
 
 dwm_cpu_old() {
 	cpu=$(top -bn1 | grep Cpu | awk '{print $2}')
 	printf "%s" "$SEP1"
-	printf "%s  %s%%" "$icon" "$cpu"
+	printf "%s  %s%%" "$ICON" "$cpu"
 	printf "%s\n" "$SEP2"
 }
 
@@ -19,7 +17,7 @@ dwm_cpu_color() {
 	reset_color="^d^"
 	cpu=$(top -bn1 | grep Cpu | awk '{print $2}')
 	printf "%s" "$SEP1"
-	printf "%s%s%s  %s%%" "$cyan_color" "$icon" "$reset_color" "$cpu"
+	printf "%s%s%s  %s%%" "$cyan_color" "$ICON" "$reset_color" "$cpu"
 	printf "%s\n" "$SEP2"
 }
 
@@ -41,7 +39,7 @@ dwm_cpu() {
 	total=$((a + b + c + idle))
 	cpu=$((100 * ((total - prevtotal) - (idle - previdle)) / (total - prevtotal)))
 	printf "%s" "$SEP1"
-	printf "%s  %s%%" "$icon" "$cpu"
+	printf "%s  %s%%" "$ICON" "$cpu"
 	printf "%s" "$SEP2"
 }
 

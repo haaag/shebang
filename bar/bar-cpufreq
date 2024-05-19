@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+# Output: [ICON governor]
+
+icon=""
+governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+
+printf "%s" "$SEP1"
+printf "%s %s" "$icon" "$governor"
+printf "%s\n" "$SEP2"

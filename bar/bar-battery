@@ -1,10 +1,18 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Output: [ICON  98%]
 # Output: [ICON  98% status]
+#         
 #           
 #        
 #      
+#   
+#   
+# 
+
+PROG=$(basename "$0")
+BAT_CHARGE=$(cat /sys/class/power_supply/BAT0/capacity)
+BAT_STATUS=$(cat /sys/class/power_supply/BAT0/status)
 
 # notification icons
 warn="🔴"
@@ -13,25 +21,45 @@ icon_empty=""
 icon_low=""
 icon_mid=""
 icon_full=""
+icon_char=""
 
-bat_charge=$(cat /sys/class/power_supply/BAT0/capacity)
-bat_status=$(cat /sys/class/power_supply/BAT0/status)
-
-notification_critical() {
+function notification_critical() {
+	local hints critical_icon_noti
 	critical_icon_noti="battery-level-10-symbolic"
-	dunstify --urgency=critical -a "Battery" "Battery" "Battery critical: " -i "$critical_icon_noti" -h int:value:"$bat_charge" -h string:x-canonical-private-synchronous:battery
+	hints="string:x-canonical-private-synchronous:battery"
+
+  if ! command -v dunstify >/dev/null 2>&1; then
+    printf "%s: %s\n" "$PROG" "notify-send is not found"
+  fi
+
+	dunstify --urgency=critical -a "Battery" "Battery" "Battery critical: " -i "$critical_icon_noti" -h int:value:"$BAT_CHARGE" -h "${hints}"
 }
 
-get_icon() {
-	icon=""
+function is_charching() {
+	local bat_status
+	bat_status=$(cat /sys/class/power_supply/BAT0/status)
 
-	if [ "$bat_charge" -lt "20" ]; then
+	if [[ "${bat_status}" != "Charging" ]]; then
+		return 1
+	fi
+	return 0
+}
+
+function get_icon() {
+	local icon=""
+
+	if is_charching; then
+		echo "$icon_char"
+		return
+	fi
+
+	if [[ "$BAT_CHARGE" -lt "20" ]]; then
 		icon="$warn $icon_critical"
-	elif [ "$bat_charge" -lt "30" ]; then
+	elif [[ "$BAT_CHARGE" -lt "30" ]]; then
 		icon="$icon_empty"
-	elif [ "$bat_charge" -lt "50" ]; then
+	elif [[ "$BAT_CHARGE" -lt "50" ]]; then
 		icon="$icon_low"
-	elif [ "$bat_charge" -lt "90" ]; then
+	elif [[ "$BAT_CHARGE" -lt "90" ]]; then
 		icon="$icon_mid"
 	else
 		icon="$icon_full"
@@ -40,38 +68,14 @@ get_icon() {
 	echo "$icon"
 }
 
-dwm_battery() {
-	printf "%s" "$SEP1"
-	printf "%s  %s%% %s" "$(get_icon)" "$bat_charge" "$bat_status"
-	printf "%s\n" "$SEP2"
-}
-
-dwm_battery_color() {
-	empty_color="^c#cc241d^"
-	mid_color="^c#e78a4e^"
-	full_color="^c#9ECE6A^"
-	reset_color="^d^"
-
-	printf "%s" "$SEP1"
-	if [ "$bat_charge" -lt "30" ]; then
-		printf "%s%s %s %s%% %s" "$empty_color" "$icon_empty" "$reset_color" "$bat_charge" "$bat_status"
-	elif [ "$bat_charge" -lt "50" ]; then
-		printf "%s%s %s %s%% %s" "$empty_color" "$icon_low" "$reset_color" "$bat_charge" "$bat_status"
-	elif [ "$bat_charge" -lt "90" ]; then
-		printf "%s%s %s %s%% %s" "$mid_color" "$icon_mid" "$reset_color" "$bat_charge" "$bat_status"
-	elif [ "$bat_charge" -lt "95" ]; then
-		printf "%s%s %s %s%%" "$full_color" "$icon_full" "$reset_color" "$bat_charge"
-	elif [ "$bat_charge" -gt "95" ]; then
-		printf "%s%s %s %s%%" "$full_color" "$icon_full" "$reset_color" "$bat_charge"
+function main() {
+	if [ "$BAT_CHARGE" -lt 15 ]; then
+		notification_critical
 	fi
+
+	printf "%s" "$SEP1"
+	printf "%b %s%%" "$(get_icon)" " $BAT_CHARGE"
 	printf "%s\n" "$SEP2"
 }
-if [ "$bat_charge" -lt "15" ]; then
-	notification_critical
-fi
 
-if [ "$DWM_COLOR" = true ]; then
-	dwm_battery_color
-else
-	dwm_battery
-fi
+main

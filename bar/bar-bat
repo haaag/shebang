@@ -134,7 +134,7 @@ class Battery:
 
     def print_pretty_status(self) -> None:
         icon = self.get_icon_for_capacity()
-        print(f"{SEP1}{icon} {self.capacity}% {self.status_str}{SEP2}")
+        print(f"{SEP1}{icon} {self.capacity}%{SEP2}")  # {self.status_str}{SEP2}")
 
     def is_charging(self) -> bool:
         return self.status == BatStatus.Charging

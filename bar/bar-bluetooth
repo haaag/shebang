@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 
+# Output: [ DEVICE 98%,  DEVICE 42%]
 # bluetooth_bat=$(bluetoothctl info | grep "Battery" | awk '{print $4}' | tr -d '()')
-#      
+#     
 
 PROG=$(basename "$0")
+LOGGER="${LOG_PATH}/${PROG}.log"
 
-# icons
+# devices icon
+ICON_HEADPHONES="" #  
+ICON_DEV_DEFAULT=""
+
+# battery icons
 warn="🔴"
 icon_critical=""
 icon_empty=""
@@ -25,8 +31,10 @@ check_battery() {
 	local device_alias battery
 	device_alias="$1"
 	battery="$2"
-	if [ "$battery" -le 10 ]; then
-		notify "$device_alias battery is low ($battery%)" "critical"
+	if [[ "$battery" -le 10 ]] && [[ "$battery" != "" ]]; then
+		msg="$device_alias battery is low (${battery}%)"
+		echo "$msg" | tee -a "$LOGGER"
+		notify "$msg" "critical"
 	fi
 }
 
@@ -68,13 +76,13 @@ get_battery_icon() {
 	icon=""
 	bat_charge="$1"
 
-	if [ "$bat_charge" -lt "20" ]; then
+	if [[ "$bat_charge" -lt "20" ]]; then
 		icon="$warn$icon_critical"
-	elif [ "$bat_charge" -lt "30" ]; then
+	elif [[ "$bat_charge" -lt "30" ]]; then
 		icon="$icon_empty"
-	elif [ "$bat_charge" -lt "50" ]; then
+	elif [[ "$bat_charge" -lt "50" ]]; then
 		icon="$icon_low"
-	elif [ "$bat_charge" -lt "90" ]; then
+	elif [[ "$bat_charge" -lt "90" ]]; then
 		icon="$icon_mid"
 	else
 		icon="$icon_full"
@@ -84,19 +92,19 @@ get_battery_icon() {
 }
 
 get_device_icon() {
-	local default_icon devices device_icon_name
+	local devices device_icon_name
 	device="$1"
-	default_icon=""
 
 	device_icon_name=$(bluetoothctl info "$device" | grep "Icon" | cut -d ' ' -f 2-)
 
 	declare -A devices=(
-		["audio-headset"]=""
+		["audio-headset"]="$ICON_HEADPHONES"
+		["audio-headphones"]="$ICON_HEADPHONES"
 	)
 	if [ -n "${devices[$device_icon_name]}" ]; then
 		echo "${devices[$device_icon_name]}"
 	else
-		echo "$default_icon"
+		echo "${ICON_DEV_DEFAULT}"
 	fi
 }
 
@@ -114,7 +122,7 @@ devices_status() {
 			bat_icon=$(get_battery_icon "$battery")
 			device_icon=$(get_device_icon "$device")
 
-			string="$device_icon $device_alias $bat_icon$battery%"
+			string="${device_icon} ${device_alias} ${bat_icon}${battery}%"
 
 			if [ $device_counter -gt 0 ]; then
 				devices_output+=", $string"

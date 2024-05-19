@@ -1,34 +1,28 @@
 #!/usr/bin/env bash
 
+PROG=$(basename "$0")
+DEPS=(jq curl)
+HUMIDITY=""
+#     
+
 # load envs
 # shellcheck source=/dev/null
-[ -f "$PRIVATE_ROOT"/openweather ] && . "$PRIVATE_ROOT"/openweather
+[[ -f "$PRIVATE_ROOT"/openweather ]] && source "$PRIVATE_ROOT"/openweather
 
-# Api
-key="$OPEN_WEATHERMAP_KEY"
-city="$OPEN_WEATHERMAP_CITY"
-units="metric"
-api="https://api.openweathermap.org/data/2.5"
+TOKEN="$OPEN_WEATHERMAP_KEY"
+CITY="$OPEN_WEATHERMAP_CITY"
+UNITS="metric"
+API="https://api.openweathermap.org/data/2.5"
+ICONS="$SCRIPTS/icons/weather/"
+GEOCLUE="https://location.services.mozilla.com/v1/geolocate?key=geoclue"
 
-# Icons
-icons="$HOME/.scripts/icons/weather/"
-
-check_dependencies() {
-	local dependencies program
-	program=$(basename "$0")
-	dependencies=(jq curl)
-
-	for cmd in "${dependencies[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			err_msg="'$cmd' command not found."
-			notification "$program script" "$err_msg"
-			title "$err_msg"
-			exit 1
-		fi
-	done
+function log_err() {
+	printf "%s: %s\n" "$PROG" "$@"
+	notify-send -i dialog-error-symbolic "$PROG" "$@"
+	exit 1
 }
 
-get_icon() {
+function get_icon() {
 	case $1 in
 	01d) icon="" ;;
 	01n) icon="" ;;
@@ -49,55 +43,89 @@ get_icon() {
 	echo "$icon "
 }
 
-get_weather() {
-	# TODO: Split...
-	if [ -n "$city" ]; then
-		if [ "$city" -eq "$city" ] 2>/dev/null; then
-			city_param="id=$city"
+function get_location() {
+	local location
+	location=$(curl -sf "$GEOCLUE")
+	if [[ -n "$location" ]]; then
+		location_lat="$(echo "$location" | jq '.location.lat')"
+		location_lon="$(echo "$location" | jq '.location.lng')"
+		weather=$(curl -sf "$API/weather?appid=$TOKEN&lat=$location_lat&lon=$location_lon&units=$UNITS")
+		weather_icon=$(echo "$weather" | jq -r ".weather[0].icon")
+	fi
+}
+
+function get_weather() {
+	# FIX: Split me...
+	if [[ -n "$CITY" ]]; then
+
+		# If is cityID
+		if [[ "$CITY" -eq "$CITY" ]] 2>/dev/null; then
+			city_param="id=$CITY"
 		else
-			city_param="q=$city"
+			city_param="q=$CITY"
 		fi
 
-		weather=$(curl -sf "$api/weather?appid=$key&$city_param&units=$units")
+		weather=$(curl -sf "$API/weather?appid=$TOKEN&$city_param&units=$UNITS")
 		weather_icon=$(echo "$weather" | jq -r ".weather[0].icon")
 	else
-		location=$(curl -sf https://location.services.mozilla.com/v1/geolocate?key=geoclue)
-		if [ -n "$location" ]; then
+		location=$(curl -sf "$GEOCLUE")
+		if [[ -n "$location" ]]; then
 			location_lat="$(echo "$location" | jq '.location.lat')"
 			location_lon="$(echo "$location" | jq '.location.lng')"
-			weather=$(curl -sf "$api/weather?appid=$key&lat=$location_lat&lon=$location_lon&units=$units")
+			weather=$(curl -sf "$API/weather?appid=$TOKEN&lat=$location_lat&lon=$location_lon&units=$UNITS")
 			weather_icon=$(echo "$weather" | jq -r ".weather[0].icon")
-			echo -e "$api/weather?appid=$key&lat=$location_lat&lon=$location_lon&units=$units"
+			echo -e "$API/weather?appid=$TOKEN&lat=$location_lat&lon=$location_lon&units=$UNITS"
 		fi
 	fi
 }
 
-send_notification() {
-	# FIX: Remove
-	curl -sd "$@" ntfy.sh/"$VOID_TOPIC" -o /dev/null
-}
-
-notification() {
+function notification() {
+	local date icon
 	date=$(date +"%a, %H:%M")
-	icon="${icons}${2}.png"
+	icon="${ICONS}${2}.png"
 	notify-send -i "$icon" "Weather $date" "$1"
 }
 
-dwm_weather() {
+function dwm_weather() {
+	local icon desc temp humidity message
 	get_weather
-  echo ">>$weather_icon"
 	icon=$(get_icon "$weather_icon")
 	desc=$(echo "$weather" | jq -r ".weather[0].description")
 	temp=$(echo "$weather" | jq ".main.temp" | cut -d "." -f 1)
 	humidity=$(echo "$weather" | jq ".main.humidity" | cut -d "." -f 1)
-	message="$desc $temp°C $humidity%"
+	message="${desc} ${temp}°C ${HUMIDITY} ${humidity}%"
 
 	printf "%s" "$SEP1"
 	printf "%s" "$icon" "$message"
 	printf "%s\n" "$SEP2"
-
 	notification "$message" "$weather_icon"
 }
 
-check_dependencies
-dwm_weather
+function bar_weather() {
+	local icon desc temp humidity message
+	get_weather
+	icon=$(get_icon "$weather_icon")
+	desc=$(echo "$weather" | jq -r ".weather[0].description")
+	temp=$(echo "$weather" | jq ".main.temp" | cut -d "." -f 1)
+	humidity=$(echo "$weather" | jq ".main.humidity" | cut -d "." -f 1)
+	message="${desc} ${temp}°C ${humidity}%"
+
+	printf "%s" "$SEP1"
+	printf "%b%s°C %b %s%%" "$icon" "$temp" "$HUMIDITY" "$humidity"
+	printf "%s\n" "$SEP2"
+}
+
+for cmd in "${DEPS[@]}"; do
+	if ! command -v "$cmd" >/dev/null; then
+		log_err "'$cmd' command not found."
+	fi
+done
+
+if ! curl -Is "${API}" >/dev/null; then
+	log_err "weather API unreachable"
+fi
+
+case "$1" in
+*notify) dwm_weather ;;
+*) bar_weather ;;
+esac
