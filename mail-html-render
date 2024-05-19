@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+PROG=$(basename "$0")
+TEMPLATE="$HOME/.config/mutt/templates/email.html"
+MARKDOWN="$(mktemp --tmpdir "$PROG.XXXXXX")"
+HTML="$(mktemp --tmpdir "$PROG.XXXXXX")"
+
+# cat - | tee -p "${MARKDOWN}"
+cat - >"${MARKDOWN}"
+
+pandoc -f markdown -t html5 --standalone --template="${TEMPLATE}" "$MARKDOWN" >"$HTML"
+
+surf "${HTML}"

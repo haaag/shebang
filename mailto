@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+PROG=$(basename "$0")
+MUTT="$XDG_CONFIG_HOME/mutt"
+
+function log_err_and_exit {
+	echo "$PROG: $*"
+	exit 1
+}
+
+function get_acc_file() {
+	local choice="$1"
+	local account_name=$(find "$MUTT/accounts" -name "*$choice*")
+
+	echo "$account_name"
+}
+
+function launch_email_client() {
+	local account_file account_name send_to
+	account_name="$1"
+	send_to="$2"
+	account_file=$(get_acc_file "$account_name")
+
+	setsid "$TERMINAL" -e neomutt "$send_to" -F "$MUTT/muttrc" -F "$account_file"
+	exit 0
+}
+
+function select_acc {
+	local accounts choice
+	accounts="$*"
+	choice=$(echo "$accounts" | dmenu -i -l "$(echo "$accounts" | wc -l)" -p "send from>")
+
+	echo "$choice"
+}
+
+function main() {
+	local send_to choice accounts account_file
+
+	accounts=$(cd "$MUTT/accounts" && find . | tail -n +2 | sed "s/\.\///g; s/\.muttrc$//g")
+	send_to="$*"
+
+	if [[ "${#accounts[@]}" -eq 0 ]]; then
+		log_err_and_exit "no accounts found in $MUTT/accounts"
+	fi
+
+	if [[ "${#accounts[@]}" -eq 1 ]]; then
+		launch_email_client "${accounts[@]}" "$send_to"
+	fi
+
+	choice=$(select_acc "$accounts")
+
+	[[ -z "$choice" ]] && exit
+
+	account_file=$(get_acc_file "$choice")
+
+	if [[ "$account_file" == "" ]]; then
+		log_err_and_exit "account '$choice' not found"
+	fi
+
+	launch_email_client "$choice" "$send_to"
+}
+
+main "$@"

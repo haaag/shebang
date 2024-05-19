@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+PROG=$(basename "$0")
+TEMP_FILE="$(mktemp --tmpdir "$PROG.XXXXXX")"
+
+cat - | tee -i "${TEMP_FILE}"
+
+$TERMINAL -n sptransen -c sptransen -g 120x30 -e glow --pager "${TEMP_FILE}"

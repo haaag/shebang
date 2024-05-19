@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+
+# original author: 
+# https://jonathanh.co.uk/blog/multipart-emails-in-neomutt/
+#
+# contributor:
+# https://github.com/haaag/
+# 
+# references:
+# https://git.jonathanh.co.uk/jab2870/Dotfiles/commit/b715061cfee9797aa1b2d0db474e981c5be3afec
+
+PROG=$(basename "$0")
+TMP="/tmp/mutt"
+CMDS="${TMP}/neomutt-commands"
+MARKDOWN="${TMP}/neomutt.md"
+HTML="${TMP}/neomutt.html"
+TEMPLATE="$HOME/.config/mutt/templates/email.html"
+
+# TODO)):
+# - [ ] save copy in pdf
+
+function log_err() {
+	printf "%s: %s\n" "$PROG" "$1" >&2
+	exit 1
+}
+
+function pre_exit() {
+	local files
+	declare -a files=("${CMDS}" "${MARKDOWN}" "${HTML}")
+
+	for file in "${files[@]}"; do
+		if [[ -f "${file}" ]]; then
+			printf "%s: %s\n" "$PROG" "cleaning up file '${file}'...not yet"
+		fi
+	done
+}
+
+trap pre_exit EXIT
+
+if [[ ! -e "$TEMPLATE" ]]; then
+	log_err "template='${TEMPLATE}' not found."
+fi
+
+if ! command -v neomutt >/dev/null; then
+	log_err "neomutt not found."
+fi
+
+# Create a temporary directory
+if [[ ! -d "${TMP}" ]]; then
+	mkdir -pv "${TMP}"
+fi
+
+cat - >"${MARKDOWN}.orig"
+echo -n "push " >"$CMDS"
+
+cp "${MARKDOWN}.orig" "$MARKDOWN"
+
+grep -Eo '!\[[^]]*\]\([^)]+' "$MARKDOWN" | cut -d '(' -f 2 |
+	grep -Ev '^(cid:|https?://)' | while read file; do
+	id="cid:$(md5sum "$file" | cut -d ' ' -f 1)"
+	sed -i "s#$file#$id#g" "$MARKDOWN"
+done
+
+if [ "$(grep -Eo '!\[[^]]*\]\([^)]+' "$MARKDOWN" | cut -d '(' -f 2 | grep '^cid:' | wc -l)" -gt 0 ]; then
+	echo -n "<attach-file>\"$MARKDOWN\"<enter><toggle-disposition><toggle-unlink><first-entry><detach-file>" >>"$CMDS"
+fi
+
+pandoc -f markdown -t html5 --standalone --template="${TEMPLATE}" "$MARKDOWN" >"$HTML"
+
+# Attach the html file
+echo -n "<attach-file>\"$HTML\"<enter>" >>"$CMDS"
+
+# Set it as inline
+echo -n "<toggle-disposition>" >>"$CMDS"
+
+# Tell neomutt to delete it after sending
+echo -n "<toggle-unlink>" >>"$CMDS"
+
+# Select both the html and markdown files
+echo -n "<tag-entry><previous-entry><tag-entry>" >>"$CMDS"
+
+# Group the selected messages as alternatives
+echo -n "<group-alternatives>" >>"$CMDS"
+
+grep -Eo '!\[[^]]*\]\([^)]+' "${MARKDOWN}.orig" | cut -d '(' -f 2 |
+	grep -Ev '^(cid:|https?://)' | while read file; do
+	id="$(md5sum "$file" | cut -d ' ' -f 1)"
+	echo -n "<attach-file>\"$file\"<enter>" >>"$CMDS"
+	echo -n "<toggle-disposition>" >>"$CMDS"
+	echo -n "<edit-content-id>^u\"$id\"<enter>" >>"$CMDS"
+	echo -n "<tag-entry>" >>"$CMDS"
+done
+
+if [ "$(grep -Eo '!\[[^]]*\]\([^)]+' "$MARKDOWN" | cut -d '(' -f 2 | grep '^cid:' |
+	wc -l)" -gt 0 ]; then
+	echo -n "<first-entry><tag-entry><group-related>" >>"$CMDS"
+fi
