@@ -1,19 +1,31 @@
 #!/usr/bin/env bash
 
-# Simple script for screenshot
+# Simple bash script for taken screenshot
 # - Pretty mode (add shadow, corner radious, white backdrop)
 # - Normal mode
+# - Full desktop
 #
 # https://github.com/flameshot-org/flameshot
 
 PROG=$(basename "$0")
 DEPENDENCIES=(flameshot convert dunstify nsxiv)
 LOCATION="${XDG_DOWNLOAD_DIR:-$HOME/downloads}"/screenshots
-IMAGE_TMP=$(mktemp --tmpdir "$PROG.XXXXX")
 
 function log_err() {
 	printf "%s: %s\n" "$PROG" "$*" >&2
 	exit 1
+}
+
+function pre_exit() {
+	local image="$1"
+
+	if [[ ! -f "$image" ]]; then
+    log_err "'${image}' not found"
+	fi
+
+  printf "%s: %s\n" "$PROG" "cleaning up file '${image}'..."
+  rm -f "$image"
+	exit 0
 }
 
 function notify() {
@@ -32,43 +44,73 @@ function open() {
 	nsxiv --geometry="${width}x${height}" "${image}" 2>/dev/null
 }
 
-function pretty() {
-	local filesize dest
-	flameshot gui --raw >"$IMAGE_TMP" 2>/dev/null
+function get_last_created() {
+  local image
+	image=$(find "${LOCATION}" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d ' ' -f2-)
+  echo "${image}"
+}
 
-	filesize=$(stat -c%s "$IMAGE_TMP")
+function pretty() {
+	local filesize image image_tmp
+	image_tmp=$(mktemp --tmpdir "$PROG.XXXXX")
+
+	# shellcheck disable=SC2064
+	trap "pre_exit $image_tmp" EXIT
+
+	flameshot gui --clipboard --raw >"$image_tmp" 2>/dev/null
+
+	filesize=$(stat -c%s "$image_tmp")
 	if [[ "$filesize" -le 0 ]]; then
 		echo "$PROG: aborting..."
 		exit 1
 	fi
 
 	# add corners
-	convert "$IMAGE_TMP" \
+	convert "$image_tmp" \
 		\( +clone -alpha extract \
 		-draw 'fill black polygon 0,0 0,15 15,0 fill white circle 15,15 15,0' \
 		\( +clone -flip \) -compose Multiply -composite \
 		\( +clone -flop \) -compose Multiply -composite \
-		\) -alpha off -compose CopyOpacity -composite "$IMAGE_TMP"
+		\) -alpha off -compose CopyOpacity -composite "$image_tmp"
 
 	# shadow
-	convert "$IMAGE_TMP" \
+	convert "$image_tmp" \
 		\( +clone -background black -shadow 40x5+0+0 \) \
-		+swap -background none -layers merge +repage "$IMAGE_TMP"
+		+swap -background none -layers merge +repage "$image_tmp"
 
 	# white backdrop
-	convert "$IMAGE_TMP" -bordercolor white -border 10 "$IMAGE_TMP"
+	convert "$image_tmp" -bordercolor white -border 10 "$image_tmp"
 
-	# copy to clipboard
-	xclip -selection clipboard -i "$IMAGE_TMP" -t image/png
-	dest="${LOCATION}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
+	# copy image
+	image="${LOCATION}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
+	cp -v "$image_tmp" "${image}"
 
-	cp -v "$IMAGE_TMP" "${dest}"
 	notify "Screenshot saved at <b>${LOCATION}</b>"
-	open "${dest}"
+	open "${image}"
 }
 
 function normal() {
-	flameshot gui --clipboard 2>/dev/null
+	local retcode
+	flameshot gui --clipboard --path "${LOCATION}" 2>/dev/null
+
+	retcode="$?"
+	if [[ "${retcode}" -ne 0 ]]; then
+		exit "${retcode}"
+	fi
+
+  open "$(get_last_created)"
+}
+
+function desktop() {
+	local retcode
+	flameshot full --clipboard --path "${LOCATION}" 2>/dev/null
+
+	retcode="$?"
+	if [[ "${retcode}" -ne 0 ]]; then
+		exit "${retcode}"
+	fi
+
+  open "$(get_last_created)"
 }
 
 function help() {
@@ -84,15 +126,19 @@ function help() {
 	exit
 }
 
-for cmd in "${DEPENDENCIES[@]}"; do
-	if ! command -v "$cmd" >/dev/null; then
-		log_err "'$cmd' command not found"
-	fi
-done
+function main() {
+	for cmd in "${DEPENDENCIES[@]}"; do
+		if ! command -v "$cmd" >/dev/null; then
+			log_err "'$cmd' command not found"
+		fi
+	done
 
-case "$1" in
--n | *normal) normal ;;
--p | *pretty) pretty ;;
--d | *desktop | *full) flameshot full -c -p "${LOCATION}" ;;
-*) help ;;
-esac
+	case "$1" in
+	-n | *normal) normal ;;
+	-p | *pretty) pretty ;;
+	-d | *desktop | *full) desktop ;;
+	*) help ;;
+	esac
+}
+
+main "$@"
