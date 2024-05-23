@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+
+# Simple script checks the current state of the
+# external microphone and toggle state (mute/unmute)
+
+# TODO)):
+# - [ ] get captures list
+
+PROG=$(basename "$0")
+MIC_INTERNAL=(1 Capture)
+MIC_EXT=(2 Mic)
+MIC_EXT_NAME="samson"
+DEPS=(dunstify amixer)
+
+declare -A CAPTURES
+CAPTURES["internal"]="${MIC_INTERNAL[*]}"
+CAPTURES["external"]="${MIC_EXT[*]}"
+CAPTURES["samson"]="${MIC_EXT[*]}"
+
+# colors
+GREEN=$(tput setaf 2)
+RED=$(tput setaf 1)
+YELLOW=$(tput setaf 3)
+RESET=$(tput sgr0)
+
+# notification icons
+NOTIFY_ENABLE="audio-input-microphone-symbolic"
+NOTIFY_DISABLE="microphone-sensitivity-muted-symbolic"
+NOTIFY_ERR="dialog-error-symbolic"
+
+function usage() {
+	printf "%s\n" "Usage: $PROG [OPTIONS]
+
+Options:
+  -s, status        Show microphone status
+  -e, enable        Enable microphone
+  -d, disable       Disable microphone
+  -t, toggle        Toggle microphone status
+  -c, captures      List available captures"
+	exit 0
+}
+
+function log_error() {
+	printf "%s: %s\n" "$PROG" "$*" >&2
+	exit 1
+}
+
+function log_msg() {
+	printf "%s: %s\n" "$PROG" "$*"
+}
+
+function notify() {
+	local icon title mesg args
+	icon="$1"
+	title="$2"
+	mesg="$3"
+	declare -a args=(--appname="$PROG")
+	args+=(--icon "$icon" --timeout 3000)
+	args+=(--hints string:x-dunst-stack-tag:microphone)
+	dunstify "${args[@]}" "$title" "$mesg"
+}
+
+function is_connected() {
+	local card="$1"
+	local mic="$2"
+
+	amixer -c "$card" get "$mic" &>/dev/null
+	local retcode=$?
+	if [[ $retcode -eq 0 ]]; then
+		return 0
+	fi
+	return 1
+}
+
+function get_capture() {
+	local arg name data
+	name="$1"
+
+	if [[ "$#" -eq 0 ]]; then
+		log_error "usage: get_capture [capture]"
+	fi
+
+	arg=$(echo "$name" | tr '[:upper:]' '[:lower:]')
+	data="${CAPTURES[$arg]}"
+
+	if [[ -z "$data" ]]; then
+		log_error "unknown capture '$name'"
+	fi
+
+	echo "$data"
+}
+
+function power_on() {
+	local card="$1"
+	local mic="$2"
+
+	if ! is_connected "$card" "$mic"; then
+		return 1
+	fi
+
+	mic_status=$(amixer -c "$card" get "$mic" | grep "Front Left:" | awk '{print $7}')
+	if [[ "$mic_status" != "[on]" ]]; then
+		return 1
+	fi
+
+	return 0
+}
+
+function status() {
+	local msg="microphone ${YELLOW}$MIC_EXT_NAME${RESET} is "
+	if power_on "${MIC_EXT[@]}"; then
+		msg+="${GREEN}enabled"
+	else
+		msg+="${RED}disable"
+	fi
+	log_msg "$msg"
+}
+
+function status-beta() {
+	local capture data card mic msg
+
+	log_msg "checking captures status..."
+	for capture in "${!CAPTURES[@]}"; do
+		data="$(get_capture "$capture")"
+		card=${data%% *}
+		mic=${data##* }
+		printf "  - %s: " "$capture"
+
+		if power_on "$card" "$mic"; then
+			echo "${GREEN}enabled${RESET}"
+		else
+			echo "${RED}disable${RESET}"
+		fi
+	done
+}
+
+function toggle-micro() {
+	local name capture card mic
+	name="$1"
+
+	if [ "$#" -eq 0 ]; then
+		log_error "usage: toggle [capture]"
+	fi
+
+	# capture=$(get_capture "$name")
+	# retcode=$?
+	# if [ $retcode -ne 0 ]; then
+	# 	log_error "unknown capture '$1'"
+	# fi
+
+	if ! get_capture "$name" >/dev/null; then
+		log_error "unknown capture '$1'"
+	fi
+
+	capture=$(get_capture "$name")
+	card=${capture%% *}
+	mic=${capture##* }
+
+	if ! is_connected "$card" "$mic"; then
+		local err_msg="'$name' not found"
+		notify "${NOTIFY_ERR}" "toggle" "${err_msg}"
+		log_error "${err_msg}"
+	fi
+
+	if power_on "$card" "$mic"; then
+		notify "$NOTIFY_DISABLE" "🔴 $PROG" "Microphone '$name' Disable"
+	else
+		notify "$NOTIFY_ENABLE" "🟢 $PROG" "Microphone '$name' Enable"
+	fi
+
+	amixer -c "$card" sset "$mic" toggle &>/dev/null
+}
+
+function available() {
+	local msg="Available captures:"
+
+	for cap in "${!CAPTURES[@]}"; do
+		msg+=" 
+  - $cap"
+	done
+
+	echo "$msg"
+}
+
+function disable-micro() {
+	local name data card mic
+	name="$1"
+
+	if [ "$#" -eq 0 ]; then
+		log_error "usage: disable [capture]"
+	fi
+
+	data="$(get_capture "$name")"
+	card=${data%% *}
+	mic=${data##* }
+
+	if ! is_connected "$card" "$mic"; then
+		local err_msg="'$name' not found"
+		notify "${NOTIFY_ERR}" "disable" "${err_msg}"
+		log_error "${err_msg}"
+	fi
+
+	if ! power_on "$card" "$mic"; then
+		log_error "'$name' already disable"
+	fi
+
+	amixer -c "$card" set "$mic" nocap &>/dev/null
+	notify "$NOTIFY_DISABLE" "🔴 $PROG" "Microphone '$1' Disable"
+}
+
+function enable-micro() {
+	local name data card mic
+
+	if [ "$#" -eq 0 ]; then
+		log_error "usage: enable [capture]"
+	fi
+
+	name="$1"
+	data="$(get_capture "$name")"
+	card=${data%% *}
+	mic=${data##* }
+
+	if ! is_connected "$card" "$mic"; then
+		local err_msg="'$name' not found"
+		notify "${NOTIFY_ERR}" "enable" "${err_msg}"
+		log_error "${err_msg}"
+	fi
+
+	if power_on "$card" "$mic"; then
+		log_error "'$1' already enable"
+	fi
+
+	amixer -c "$card" set "$mic" cap &>/dev/null
+	notify "$NOTIFY_ENABLE" "🟢 $PROG" "Microphone '$1' Enable"
+}
+
+function main() {
+	# Always disable built-in microphone
+	if power_on "${MIC_INTERNAL[@]}"; then
+		disable-micro "internal" "${MIC_INTERNAL[@]}"
+	fi
+
+	case "$1" in
+	-s | status) status-beta ;;
+	-t | toggle) shift && toggle-micro "$@" ;;
+	-e | enable) shift && enable-micro "$@" ;;
+	-d | disable) shift && disable-micro "$@" ;;
+	-c | captures) log_msg "$(available)" ;;
+	*) usage ;;
+	esac
+}
+
+for dep in "${DEPS[@]}"; do
+	if ! command -v "$dep" >/dev/null; then
+		notify "$NOTIFY_ERR" "$PROG" "$dep not found"
+		log_error "$dep not found"
+	fi
+done
+
+main "$@"
