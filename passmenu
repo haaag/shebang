@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+
+shopt -s nullglob globstar
+
+PROG=$(basename "$0")
+EDITOR="nvim -u NONE"
+LOGGER="${LOG_PATH:-$HOME}/$PROG.log"
+PASSWORD_STORE_CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-15}
+DEPS=(dunstify xdotool pass)
+
+# colors
+YELLOW="#D79921"
+BLUE="#458588"
+MAGENTA="#D3869B"
+
+function usage() {
+	cat <<-EOF
+		Usage: $PROG [options]
+
+		options:
+		  -m, --menu    Select from passwords
+		  -e, --edit    Edit selected password
+		  -l, --list    List all passwords
+		  -o, --otp     Copy one-time-password
+		  -h, --help    Show this help message and exit
+	EOF
+	exit 0
+}
+
+function log_err() {
+	printf "%s: %s\n" "$PROG" "$*" >&2
+	exit 1
+}
+
+function is_terminal() {
+	if [[ ! -t 1 ]]; then
+		return 1
+	fi
+	return 0
+}
+
+function notify() {
+	local mesg
+	mesg="$1"
+	export DISPLAY=":0"
+	declare -a args=(--hints=string:x-dunst-stack-tag:pass)
+	args+=(-i dialog-password-symbolic)
+	dunstify "${args[@]}" "$PROG" "$mesg"
+}
+
+function get_password_paths() {
+	local prefix=${PASSWORD_STORE_DIR-~/.password-store}
+	local password_files=("$prefix"/**/*.gpg)
+	password_files=("${password_files[@]#"$prefix"/}")
+	password_files=("${password_files[@]%.gpg}")
+	printf '%s\n' "${password_files[@]}"
+}
+
+function edit() {
+	local passwords
+	declare -a passwords=()
+	mapfile -t passwords < <(get_password_paths)
+	password=$(printf '%s\n' "${passwords[@]}" | fzf --no-preview --reverse --prompt='PassEdit> ')
+
+	[[ -n $password ]] || exit
+	pass edit "$password"
+	exit 0
+}
+
+function get_pass_with_menu() {
+	local prompt passwords args extra_args
+	prompt="${1:-"Pass>"}"
+	shift
+
+	extra_args=("$@")
+	declare -a args=(-l 10 -i -p "$prompt")
+
+	# shellcheck disable=SC2128
+	[[ -n "$extra_args" ]] && args+=("${extra_args[@]}")
+
+	declare -a passwords=()
+	mapfile -t passwords < <(get_password_paths)
+	password=$(printf '%s\n' "${passwords[@]}" | "$dmenu" "${args[@]}")
+	echo "$password"
+}
+
+function menu() {
+	local icon password mesg
+	icon=""
+	declare -a passwords=()
+	mapfile -t passwords < <(get_password_paths)
+
+	password=$(get_pass_with_menu "${icon} Password>" "-sb" "$BLUE")
+
+	[[ -z "${password}" ]] && exit
+
+	pass show -c "$password" 2>/dev/null
+	mesg="Copied <b>${password}</b> to clipboard.\n\n"
+	mesg+="Will clear in 15 seconds."
+	notify "$mesg"
+	exit 0
+}
+
+function list() {
+	local passwords
+	declare -a passwords=()
+	mapfile -t passwords < <(get_password_paths)
+	password=$(printf '%s\n' "${passwords[@]}" | fzf --no-preview --reverse --prompt='Pass> ')
+	echo "$password"
+}
+
+function otp_code() {
+	local icon password mesg
+	icon=""
+	password=$(get_pass_with_menu "${icon} PassOTP>" "-sb" "$YELLOW")
+
+	[[ -z "${password}" ]] && exit
+
+	pass otp -c "${password}"
+	retcode=$?
+
+	if [[ "$retcode" -gt 0 ]]; then
+		notify "No OTP found for <b>${password}</b>"
+		echo "No OTP found for ${password}" | xclip -selection clipboard
+		exit 1
+	fi
+
+	mesg="Copied OTP code for <b>${password}</b> to clipboard.\n\n"
+	mesg+="<i>Will clear in ${PASSWORD_STORE_CLIP_TIME} seconds.</i>"
+	notify "$mesg"
+	exit 0
+}
+
+function dump() {
+	local password
+	shift
+	password="$1"
+
+	if [[ -z "${password}" ]]; then
+		password=$(get_pass_with_menu "PassDump>" "-sb" "$MAGENTA")
+	fi
+
+	[[ -z "${password}" ]] && exit
+
+	pass show "$password" | {
+		IFS= read -r pass
+		printf %s "$pass"
+	} | $xdotool
+	exit 0
+}
+
+for cmd in "${DEPS[@]}"; do
+	if ! command -v "$cmd" >/dev/null; then
+		log_err "'$cmd' not found"
+	fi
+done
+
+if [[ -n $WAYLAND_DISPLAY ]]; then
+	dmenu="dmenu-wl"
+	xdotool="ydotool type --file -"
+elif [[ -n $DISPLAY ]]; then
+	dmenu="dmenu"
+	xdotool="xdotool type --clearmodifiers --file -"
+else
+	log_err "no wayland or x11 display detected" >&2
+fi
+
+case "$1" in
+-m | --menu) menu ;;
+-e | --edit) edit ;;
+-l | --list) list ;;
+-o | --otp) otp_code ;;
+-d | --dump) dump "$@" ;;
+*) usage ;;
+esac
