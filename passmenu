@@ -2,13 +2,20 @@
 
 shopt -s nullglob globstar
 
+# TODO)):
+# - [ ] remove `fzf` deps
+
 PROG=$(basename "$0")
 EDITOR="nvim -u NONE"
 LOGGER="${LOG_PATH:-$HOME}/$PROG.log"
 PASSWORD_STORE_CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-15}
-DEPS=(dunstify xdotool pass)
+DEPS=(dunstify xdotool pass fzf)
 
-# colors
+# Menu
+MENU=""
+declare -a MENU_ARGS
+
+# Colors
 YELLOW="#D79921"
 BLUE="#458588"
 MAGENTA="#D3869B"
@@ -18,10 +25,11 @@ function usage() {
 		Usage: $PROG [options]
 
 		options:
-		  -m, --menu    Select from passwords
+		  -m, --menu    Select password with menu
 		  -e, --edit    Edit selected password
 		  -l, --list    List all passwords
 		  -o, --otp     Copy one-time-password
+		  -t, --type    Password is typed into the terminal
 		  -h, --help    Show this help message and exit
 	EOF
 	exit 0
@@ -32,7 +40,7 @@ function log_err() {
 	exit 1
 }
 
-function is_terminal() {
+function in_terminal() {
 	if [[ ! -t 1 ]]; then
 		return 1
 	fi
@@ -42,10 +50,18 @@ function is_terminal() {
 function notify() {
 	local mesg
 	mesg="$1"
-	export DISPLAY=":0"
+	# export DISPLAY=":0"
 	declare -a args=(--hints=string:x-dunst-stack-tag:pass)
 	args+=(-i dialog-password-symbolic)
 	dunstify "${args[@]}" "$PROG" "$mesg"
+}
+
+function add_prompt() {
+	if [[ "$MENU" =~ ^fzf$ ]]; then
+		MENU_ARGS+=(--prompt="$1")
+	else
+		MENU_ARGS+=(-p "$1")
+	fi
 }
 
 function get_password_paths() {
@@ -60,27 +76,35 @@ function edit() {
 	local passwords
 	declare -a passwords=()
 	mapfile -t passwords < <(get_password_paths)
-	password=$(printf '%s\n' "${passwords[@]}" | fzf --no-preview --reverse --prompt='PassEdit> ')
+	add_prompt "PassEdit> "
+	# password=$(printf '%s\n' "${passwords[@]}" | fzf --no-preview --reverse --prompt='PassEdit> ')
+	password=$(printf '%s\n' "${passwords[@]}" | "$MENU" "${MENU_ARGS[@]}")
 
-	[[ -n $password ]] || exit
+	[[ -z $password ]] && exit
+
+	if [[ "$MENU" == "dmenu" ]]; then
+		$TERMINAL -e pass edit "$password"
+		exit 0
+	fi
+
 	pass edit "$password"
 	exit 0
 }
 
 function get_pass_with_menu() {
-	local prompt passwords args extra_args
+	local prompt passwords
+	declare -a passwords=()
 	prompt="${1:-"Pass>"}"
+	add_prompt "$prompt"
 	shift
 
-	extra_args=("$@")
-	declare -a args=(-l 10 -i -p "$prompt")
+	if [[ "$MENU" == "dmenu" && -n "$*" ]]; then
+		# shellcheck disable=SC2128
+		MENU_ARGS+=("$@")
+	fi
 
-	# shellcheck disable=SC2128
-	[[ -n "$extra_args" ]] && args+=("${extra_args[@]}")
-
-	declare -a passwords=()
 	mapfile -t passwords < <(get_password_paths)
-	password=$(printf '%s\n' "${passwords[@]}" | "$dmenu" "${args[@]}")
+	password=$(printf "%s\n" "${passwords[@]}" | "$MENU" "${MENU_ARGS[@]}")
 	echo "$password"
 }
 
@@ -90,7 +114,7 @@ function menu() {
 	declare -a passwords=()
 	mapfile -t passwords < <(get_password_paths)
 
-	password=$(get_pass_with_menu "${icon} Password>" "-sb" "$BLUE")
+	password=$(get_pass_with_menu "${icon} Password> " "-sb" "$BLUE")
 
 	[[ -z "${password}" ]] && exit
 
@@ -112,7 +136,7 @@ function list() {
 function otp_code() {
 	local icon password mesg
 	icon=""
-	password=$(get_pass_with_menu "${icon} PassOTP>" "-sb" "$YELLOW")
+	password=$(get_pass_with_menu "${icon} PassOTP> " "-sb" "$YELLOW")
 
 	[[ -z "${password}" ]] && exit
 
@@ -131,7 +155,7 @@ function otp_code() {
 	exit 0
 }
 
-function dump() {
+function type_password() {
 	local password
 	shift
 	password="$1"
@@ -156,20 +180,36 @@ for cmd in "${DEPS[@]}"; do
 done
 
 if [[ -n $WAYLAND_DISPLAY ]]; then
-	dmenu="dmenu-wl"
+	MENU="dmenu-wl"
 	xdotool="ydotool type --file -"
 elif [[ -n $DISPLAY ]]; then
-	dmenu="dmenu"
 	xdotool="xdotool type --clearmodifiers --file -"
 else
 	log_err "no wayland or x11 display detected" >&2
 fi
 
-case "$1" in
--m | --menu) menu ;;
--e | --edit) edit ;;
--l | --list) list ;;
--o | --otp) otp_code ;;
--d | --dump) dump "$@" ;;
-*) usage ;;
-esac
+function load_menu() {
+	if in_terminal; then
+		MENU="fzf"
+		MENU_ARGS=(--no-preview --reverse)
+	else
+		MENU="dmenu"
+		MENU_ARGS=(-l 10)
+	fi
+}
+
+function main() {
+	load_menu
+
+	case "$1" in
+	-m | --menu) menu ;;
+	-e | --edit) edit ;;
+	-l | --list) list ;;
+	-o | --otp) otp_code ;;
+	-t | --type) type_password "$@" ;;
+	# -t | --test) testtest ;;
+	*) usage ;;
+	esac
+}
+
+main "$@"
