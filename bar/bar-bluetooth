@@ -117,6 +117,10 @@ devices_status() {
 		if is_device_connected "$device"; then
 			device_alias=$(get_device_alias "$device")
 			battery=$(get_device_battery "$device")
+      if [[ -z "$battery" ]]; then
+        continue
+      fi
+
 			check_battery "$device_alias" "$battery"
 
 			bat_icon=$(get_battery_icon "$battery")
@@ -124,7 +128,7 @@ devices_status() {
 
 			string="${device_icon} ${device_alias} ${bat_icon}${battery}%"
 
-			if [ $device_counter -gt 0 ]; then
+			if [[ $device_counter -gt 0 ]]; then
 				devices_output+=", $string"
 			else
 				devices_output+=$string

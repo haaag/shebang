@@ -23,16 +23,21 @@ icon_mid=""
 icon_full=""
 icon_char=""
 
-function notification_critical() {
-	local hints critical_icon_noti
-	critical_icon_noti="battery-level-10-symbolic"
-	hints="string:x-canonical-private-synchronous:battery"
+function notify() {
+	local args
+  declare -a args=()
 
   if ! command -v dunstify >/dev/null 2>&1; then
     printf "%s: %s\n" "$PROG" "notify-send is not found"
   fi
 
-	dunstify --urgency=critical -a "Battery" "Battery" "Battery critical: " -i "$critical_icon_noti" -h int:value:"$BAT_CHARGE" -h "${hints}"
+  args+=(--appname="Battery" "Battery" "Battery critical: ")
+  args+=(--replace=999)
+  args+=(--icon="battery-level-10-symbolic")
+  args+=(--hints=int:value:"$BAT_CHARGE")
+  args+=(--hints=string:x-canonical-private-synchronous:battery)
+
+  dunstify "${args[@]}"
 }
 
 function is_charching() {
@@ -69,8 +74,8 @@ function get_icon() {
 }
 
 function main() {
-	if [ "$BAT_CHARGE" -lt 15 ]; then
-		notification_critical
+	if [[ "$BAT_CHARGE" -lt 15 ]]; then
+		notify
 	fi
 
 	printf "%s" "$SEP1"

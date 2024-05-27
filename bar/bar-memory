@@ -4,10 +4,10 @@
 
 #      
 #     
-ICON=" "
+ICON=" "
 
 # The bash shell arithmetic expression ((...)) can't handle floating point.
-[ -z "$(which bc)" ] && echo "bc command not found." && exit 1
+[[ -z "$(which bc)" ]] && echo "bc command not found." && exit 1
 
 function dwm_memory() {
 	total=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
@@ -28,10 +28,11 @@ function simple_dwm_memory() {
 }
 
 function get_ram() {
-	local total_ram=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
-	local used_ram_bytes=$(free --mebi | sed -n '2{p;q}' | awk '{print ($3 / 1024)}')
-	local percentage_ram=$(echo "$used_ram_bytes*100/$total_ram" | bc)
-	local used_memory_ram=$(free -h | sed -n "2s/\([^ ]* *\)\{2\}\([^ ]*\).*/\2/p")
+  local total_ram used_ram_bytes percentage_ram used_memory_ram
+	total_ram=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
+	used_ram_bytes=$(free --mebi | sed -n '2{p;q}' | awk '{print ($3 / 1024)}')
+	percentage_ram=$(echo "$used_ram_bytes*100/$total_ram" | bc)
+	used_memory_ram=$(free -h | sed -n "2s/\([^ ]* *\)\{2\}\([^ ]*\).*/\2/p")
 	printf "%s %s %s%%" "$ICON" "$used_memory_ram" "$percentage_ram"
 }
 

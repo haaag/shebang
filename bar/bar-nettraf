@@ -20,6 +20,6 @@ update() {
 rx=$(update /sys/class/net/[ew]*/statistics/rx_bytes)
 tx=$(update /sys/class/net/[ew]*/statistics/tx_bytes)
 
-printf "$SEP1%s  %4sB %s %4sB$SEP2\\n" "$icon_down" "$(numfmt --to=iec "$rx")" "$icon_up" "$(numfmt --to=iec "$tx")"
+printf "$SEP1%s  %4sB %s  %4sB$SEP2\\n" "$icon_down" "$(numfmt --to=iec "$rx")" "$icon_up" "$(numfmt --to=iec "$tx")"
 
 # printf "🔻%4sB 🔺%4sB\\n" $(numfmt --to=iec $rx $tx)
