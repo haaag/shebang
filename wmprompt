@@ -1,44 +1,45 @@
 #!/bin/env bash
-#
-# Simple bash script that provides several
-# options for system management and control.
-#
 
-program=$(basename "$0")
-dependencies=(dmenu dwm slock)
+# Simple bash script for system prompt.
+# Dependencies: dmenu, dwm, slock
 
-for cmd in "${dependencies[@]}"; do
-	if ! command -v "$cmd" >/dev/null; then
-		err "'$cmd' command not found."
-	fi
-done
+PROG=$(basename "$0")
+DEPS=(dmenu dwm slock)
+OPTS=(" Lock" "⏾ Suspend" " Hibernate" " Logout")
+OPTS+=(" Reboot" " PowerOff" " RestartWM" " DisplayOff")
 
-err() {
-	local msg
-	msg="$1"
-	notify-send -i 'dialog-error' "$program" "$msg"
-	echo "${program}: $*" >&2
+lod_err_exit() {
+	printf "%s: %s\n" "$PROG" "$*" >&2
 	exit 1
 }
 
-logout_dwm() {
-	local exit_wm
-	exit_wm="$WM_EXIT_SIGNAL"
-	touch "$exit_wm"
-	killall dwm
+print_stdout() {
+	printf "%s: %s\n" "$PROG" "$*"
 }
 
-PROMPT=" Lock| Suspend| Hibernate| Logout| Reboot"
-PROMPT+="| Shutdown | Restart-DW| DisplayOff"
-CHOSE=$(echo -e "$PROMPT" | sed 's/|/\n/g' | dmenu -h 21 -i -p "System>")
+main() {
+	local uptime chosen
 
-case "$CHOSE" in
-*Lock) slock ;;
-*Suspend) sudo zzz ;;
-*Hibernate) sudo ZZZ ;;
-*Logout) logout_dwm ;;
-*RestartWM) killall dwm ;;
-*Reboot) sudo reboot ;;
-*Shutdown) sudo poweroff ;;
-*DisplayOff) xset dpms force off ;;
-esac
+	for cmd in "${DEPS[@]}"; do
+		if ! command -v "$cmd" >/dev/null; then
+			lod_err_exit "'$cmd' command not found."
+		fi
+	done
+
+	uptime=$(uptime -p | sed -e 's/up //g')
+	chosen=$(printf "%s\n" "${OPTS[@]}" | dmenu -h 22 -i -p "$(hostname): $uptime")
+
+	case "$chosen" in
+	*Lock) print_stdout "locking screen with slock" && slock ;;
+	*Suspend) print_stdout "suspending system with zzz" && sudo zzz ;;
+	*Hibernate) print_stdout "hibernating system with ZZZ" && suspend-hybrid.sh manual ;;
+	*Logout) print_stdout "logging out" && pkill -x Xorg ;;
+	*RestartWM) print_stdout "restarting dwm" && pkill -x dwm ;;
+	*Reboot) print_stdout "rebooting system" && sudo reboot ;;
+	*PowerOff) print_stdout "powering off system" && sudo -A poweroff ;;
+	*DisplayOff) print_stdout "powering off display" && xset dpms force off ;;
+	*) exit ;;
+	esac
+}
+
+main
