@@ -1,79 +1,87 @@
 #!/usr/bin/env bash
-#
-# Script Name: ytmpv
-# Description: Play a video from a given URL using mpv with notifications and logging.
-# Author: @haaag
-# Version: 0.1
-#
-# Usage:
+
+# usage:
 #   $ ytmpv <URL>
 #
-# Dependencies:
-#   - mpv (Media player)
-#   - wget (For URL content retrieval)
-#   - setsid (For running mpv in a new session)
-#
-# Note: This script checks for the presence of mpv and wget in the system.
-# If any of them is missing, it will display an error message and exit.
-#
-# The script retrieves the video title and sends a desktop notification.
-#
-# Example:
+# example:
 #   $ ytmpv "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+#
+# description: play a video from a given url using mpv with notifications and logging.
+# author: @haaag
+# version: 0.1
 
 set -o errexit
 set -o pipefail
-set -o nounset
 
-[[ -v debug ]] && set -x
+PROG=$(basename "$0")
+DEPS=(mpv curl perl)
+LOGGER="${LOG_PATH:-$HOME/docs/log}/${PROG}.log"
+XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-# shellcheck disable=SC1091
-[ -f "$HOME/.config/shell/utils.sh" ] && source "$HOME/.config/shell/utils.sh"
+create_file() {
+	local file="$1"
+	touch "$file"
+	sleep 1
+}
 
-program=$(basename "$0")
-dependencies=(mpv wget)
-args="--hsts-file=$XDG_CACHE_HOME/wget-hsts"
+log_err() {
+	printf "%s: %s\n" "$PROG" "$*" >&2
+	exit 1
+}
 
 check_dependencies() {
-	for cmd in "${dependencies[@]}"; do
+	for cmd in "${DEPS[@]}"; do
 		if ! command -v "$cmd" >/dev/null; then
-			echo "$program: dependency '$cmd' not found"
-			exit 1
+			log_err "dependency '$cmd' not found"
 		fi
 	done
 }
 
+log_mesg() {
+	local title="$1"
+	local url="$2"
+	echo "[$(date '+%F %T')]::[$PROG]::${title}::[URL]::${url}" | tee -a "$LOGGER" >/dev/null
+}
+
 notification() {
 	local mesg="Launching: $1"
-	notify-send "$program" "$mesg"
+	notify-send "$PROG" "$mesg"
 }
 
 open_mpv() {
 	setsid mpv --input-ipc-server="${MPVSOCKET:-/tmp/mpvsocket}" -quiet "$1" >/dev/null 2>&1 &
 }
 
+usage() {
+	cat <<-_EOF
+		Usage: $PROG <URL>
+	_EOF
+	exit
+}
+
 main() {
 	local url video_title
-	[[ -z $1 ]] && echo "$program: You must enter a URL." && exit
-	url="$1"
+	if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+		usage
+	fi
 
 	check_dependencies
 
-	if ! wget "$args" -q --spider "$url"; then
-		# '--spider' Check the availability of the URL without downloading its content
-		echo "Failed to retrieve the URL: $url"
-		exit 1
+	url="$1"
+	[[ -z "$url" ]] && log_err "no <URL> found"
+
+	if ! curl -sL -I "$url" >/dev/null 2>&1; then
+		log_err "failed to retrieve the URL: '$url'"
 	fi
 
-	video_title=$(wget "$args" -qO- "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
-
-	if [ -z "$video_title" ]; then
-		video_title="err: Failed to extract video title."
+	video_title=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
+	if [[ -z "$video_title" ]]; then
+		video_title="err: failed to extract video title."
 	fi
 
-	void_logger "$program" "$video_title: $url"
+	log_mesg "$video_title" "$url"
 	open_mpv "$url"
 	notification "$video_title"
 }
 
-main "$1"
+main "$@"

@@ -1,31 +1,45 @@
 #!/usr/bin/env bash
 
-# Extracts the YouTube channel ID from a given URL and displays it
-# I use this simple script for `newsboat` and news feeds.
+# Extracts the <YouTube Channel ID> from a given <URL>
+# Extracts <channel_id> from <url> https://www.youtube.com/@username
 
-prog=$(basename "$0")
-deps=(rg wget)
-args="--hsts-file=${XDG_CACHE_HOME:-~/.cache}/wget-hsts"
+PROG=$(basename "$0")
+DEPS=(curl grep)
+
+usage() {
+	cat <<-_EOF
+		usage: $PROG <URL>
+
+		example:
+		  https://www.youtube.com/@username
+	_EOF
+	exit 0
+}
 
 err_and_exit() {
-	local msg="$1"
-	printf "%s: %s" "$prog" "$msg"
+	printf "%s: %s\n" "$PROG" "$@"
 	exit 1
 }
 
-[[ -z "$1" ]] && err_and_exit "no yt-channel url found"
-
-for dep in "${deps[@]}"; do
+for dep in "${DEPS[@]}"; do
 	if ! command -v "$dep" >/dev/null; then
-		err_and_exit "dependency '$dep' not found"
+		err_and_exit "cmd '$dep' not found"
 	fi
 done
 
-channel_id=$(wget "$args" -qO- "$1" | rg -oP 'href="https://www\.youtube\.com/feeds/videos\.xml\?channel_id=\K[^"]+')
-
-if [[ -z "$channel_id" ]]; then
-	err_and_exit "no channel ID found in the provided URL"
+if [[ "$#" -ne 1 ]]; then
+	usage
 fi
 
-channel_url="https://www.youtube.com/feeds/videos.xml?channel_id=$channel_id"
-printf "%s\n" "$channel_url"
+url="$1"
+[[ -z "$url" ]] && err_and_exit "no <URL> found"
+
+channel_id=$(curl -sL "$url" | grep -oP 'href="https://www\.youtube\.com/feeds/videos\.xml\?channel_id=\K[^"]+')
+
+if [[ -z "$channel_id" ]]; then
+	err_and_exit "no <Channel ID> found in the provided <URL>"
+fi
+
+channel_url="https://www.youtube.com/feeds/videos.xml?channel_id=${channel_id}"
+echo "$channel_url" | xclip -selection clipboard
+echo "$channel_url"
