@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+PROG="${0##*/}"
+LOGGER="${SCRIPT_LOG_PATH:-$HOME/docs/log}/suspend-hibernate.log"
+
+# lock files
+LOCKS=$HOME
+HIBERNATE_LOCK="$LOCKS/hibernate.lock"
+WAKEUP_LOCK="$LOCKS/wakeup.lock"
+MANUAL_LOCK="$LOCKS/manual.lock"
+SLEEP=3s
+
+function logger() {
+	if [[ ! -f "$LOGGER" ]]; then
+		create_file "$LOGGER"
+	fi
+
+	echo "$(date '+%F %T')::[$PROG]::$1" | tee -a "$LOGGER"
+}
+
+function line() {
+	local w="79"
+	local char="-"
+	printf "%${w}s\n" | sed "s/ /$char/g"
+}
+
+function separator() {
+	line | tee -a "$LOGGER"
+}
+
+function is_manual_hibernate() {
+	if [[ ! -f "$MANUAL_LOCK" ]]; then
+		return 1
+	fi
+
+	logger "found $MANUAL_LOCK"
+	return 0
+}
+
+function remove_lock() {
+	local file="$1"
+
+	if [[ ! -f "$file" ]]; then
+		return
+	fi
+
+	rm -f "$file" && logger "removing $file"
+	sleep 0.5
+}
+
+function create_file() {
+	local file="$1"
+	touch "$file"
+	logger "creating $file"
+	sleep 0.3
+}
+
+function is_ready_to_hibernate() {
+	if [[ ! -f "$HIBERNATE_LOCK" ]]; then
+		return 1
+	fi
+
+	logger "found $HIBERNATE_LOCK"
+	return 0
+}
+
+function suspend_hybrid() {
+	logger "setting up to after wake-up"
+	create_file "$WAKEUP_LOCK"
+
+	logger "entering hibernate-mode...sudo ZZZ"
+	separator
+	sudo ZZZ
+}
+
+while true; do
+	if is_ready_to_hibernate; then
+		remove_lock "$HIBERNATE_LOCK"
+		suspend_hybrid
+	fi
+
+	if is_manual_hibernate; then
+		remove_lock "$MANUAL_LOCK"
+		suspend_hybrid
+	fi
+
+	sleep "$SLEEP"
+done
