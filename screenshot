@@ -120,7 +120,7 @@ function help() {
 		options:
 		  -p, --pretty      Add shadow, round corners and white backdrop
 		  -n, --normal      Normal screenshot with flameshot GUI
-		  -d, --destop      Desktop screenshot
+		  -d, --desktop     Desktop screenshot
 		  -h, --help        Show this help
 	_EOF
 	exit
