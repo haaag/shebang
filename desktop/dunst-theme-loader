@@ -3,64 +3,70 @@
 # simple script to load dunst themes.
 # requires: dunst, dunstify
 
-PROG=$(basename "$0")
-ROOT="$XDG_CONFIG_HOME"/dunst
-THEMES="$ROOT"/themes
-SETTINGS="$ROOT"/dunst.settings
-DUNSTRC="$ROOT"/dunstrc
-LIST=("$THEMES"/*)
-HEADER="# DO NOT EDIT! This file will be overwritten by $PROG.
-# Edit the file '$SETTINGS' instead.
-# See '$PROG --help' for more information.
+set -e
 
-"
+PROG=$(basename "$0")
+DEPS=(dunstify dunst)
+DOT="\u2022"
+
+# files
+DUNST_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"/dunst
+THEMES="$DUNST_HOME"/themes
+DEFAULTS="$DUNST_HOME"/dunst.defaults
+DUNSTRC="$DUNST_HOME"/dunstrc
+LIST=("$THEMES"/*)
+
+HEADER="# DO NOT EDIT! This file will be overwritten by $PROG script.
+# Customization should be done in '$DEFAULTS' instead.
+# See '$PROG --help' for more information."
 
 usage() {
-	echo "usage: $PROG [-s --set THEME] [-l --list] [-r --reload]"
+	cat <<-_EOF
+		Usage: $PROG [options]
+
+		Options:
+		  -s, --set <name>      Set theme 
+		  -r, --reload          Reload configuration
+		  -l, --list            List available themes
+		  -h, --help            Show this message
+
+		Locations:
+		  themes: $THEMES
+		  defaults: $DEFAULTS
+	_EOF
 }
 
 log_err() {
-	printf "%s: %s\n" "$PROG" "$*"
+	printf "%s: %s\n" "$PROG" "$*" >&2
 	exit 1
-}
-
-check_deps() {
-	local deps=(dunstify dunst)
-	for cmd in "${deps[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			log_err "dunst not found"
-		fi
-	done
-}
-
-check_files() {
-	if [ ! -f "$SETTINGS" ]; then
-		log_err "settings file '$SETTINGS' not found"
-	fi
 }
 
 notify() {
 	local msg="$1"
 	export DISPLAY=":0"
-	dunstify -i "messagebox_info" "$PROG" "$msg"
+	# dunstify -i "messagebox_info" "$PROG" "$msg"
+	dunstify -i gnome-settings-theme "$PROG" "$msg"
 }
 
-kill_dunst() {
+reload() {
+	local retcode mesg
+	mesg="$1"
+
 	pkill dunst >/dev/null
-	code="$?"
-	if [ "$code" -eq 0 ]; then
-		notify "configuration reloaded"
+	retcode="$?"
+
+	if [[ "$retcode" -eq 0 && -n "$mesg" ]]; then
+		notify "$mesg"
 	fi
 }
 
 get_theme() {
-	local name base
+	local name base result
 	name="$1"
-	result=""
 
 	for theme in "${LIST[@]}"; do
 		base=$(basename "$theme")
-		if [ "$base" = "$name" ]; then
+		if [[ "$base" = "$name" ]]; then
 			result="$theme"
 		fi
 	done
@@ -68,54 +74,70 @@ get_theme() {
 	echo "$result"
 }
 
-set_theme() {
-	local theme
-	theme=$(get_theme "$1")
-
-	if [ -z "$theme" ]; then
-		log_err "theme '$1' not found"
-	fi
-
-	create_theme "$theme"
-}
-
 create_theme() {
 	local theme="$1"
+	local name="$2"
 
-	rm "$DUNSTRC"
+	if [[ -f "$DUNSTRC" ]]; then
+		rm "$DUNSTRC"
+	fi
 
 	{
 		echo "$HEADER"
-		cat "$SETTINGS"
+		cat "$DEFAULTS"
 		cat "$theme"
-		printf "\n%s" "# vim: ft=cfg"
 	} >>"$DUNSTRC"
 
-	kill_dunst
+	reload "<b>$name</b> loaded"
+}
+
+set_theme() {
+	local theme name
+	name="$1"
+	theme=$(get_theme "$name")
+
+	if [[ -z "$theme" ]]; then
+		log_err "theme '$1' not found"
+	fi
+
+	create_theme "$theme" "$name"
 }
 
 list_themes() {
-	usage
-	echo
-	echo "available themes:"
+	local theme
+	printf "Usage: %s --set <name>" "$PROG"
+	printf "\n\nThemes:\n"
+
 	for theme in "${LIST[@]}"; do
-		echo "  - $(basename "$theme")"
+		printf "  %b %s\n" "$DOT" "$(basename "$theme")"
 	done
 	exit 0
 }
 
-main() {
-	check_deps
-	check_files
+edit_defaults() {
+  "${EDITOR:-vim}" "$DEFAULTS"
+}
 
+main() {
 	local option theme
 	option="$1"
 	theme="$2"
 
+	for cmd in "${DEPS[@]}"; do
+		if ! command -v "$cmd" >/dev/null; then
+			log_err "'$cmd' not found"
+		fi
+	done
+
+	if [[ ! -f "$DEFAULTS" ]]; then
+		log_err "settings file '$DEFAULTS' not found"
+	fi
+
 	case "$option" in
-	-s | --set) set_theme "$2" ;;
-	-l | --list) list_themes ;;
-	-r | --reload) kill_dunst ;;
+	-s | *set) set_theme "$2" ;;
+  -e | *edit) edit_defaults ;;
+	-l | *list) list_themes ;;
+	-r | *reload) reload "configuration <b>reloaded</b>" ;;
 	*) usage ;;
 	esac
 }
