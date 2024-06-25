@@ -6,8 +6,8 @@ LOGGER="${SCRIPT_LOG_PATH:-$HOME/docs/log}/suspend-hibernate.log"
 
 # 20m AC offline
 HIBERNATE_DELAY=20
-# 45m AC online
-HIBERNATE_DELAY_CHAR=45
+# 60m AC online
+HIBERNATE_DELAY_CHAR=60
 
 # lock files
 LOCKS=$HOME
@@ -20,6 +20,16 @@ TIMER="/tmp/timer.log"
 usage() {
 	echo "Usage: $PROG [suspend|resume]"
 	exit 1
+}
+
+logger() {
+	local now
+	if [[ ! -f "$LOGGER" ]]; then
+		create_file "$LOGGER"
+	fi
+
+	now=$(date '+%F %T')
+	echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
 }
 
 line() {
@@ -59,18 +69,8 @@ create_file() {
 	sleep 1
 }
 
-logger() {
-	local now
-	if [[ ! -f "$LOGGER" ]]; then
-		create_file "$LOGGER"
-	fi
-
-	now=$(date '+%F %T')
-	echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
-}
-
 battery_status() {
-  local bat_status bat_charge
+	local bat_status bat_charge
 	bat_charge=$(cat /sys/class/power_supply/BAT0/capacity)
 	bat_status=$(cat /sys/class/power_supply/BAT0/status)
 
@@ -88,7 +88,7 @@ is_hibernate_mode() {
 is_ac_online() {
 	# /sys/class/power_supply/AC/online
 	# online == 1 | offline == 0
-  local status
+	local status
 	status=$(cat /sys/class/power_supply/AC/online)
 	if [[ "$status" = "0" ]]; then
 		return 1
@@ -98,7 +98,7 @@ is_ac_online() {
 }
 
 is_manual_hibernate() {
-  # FIX: Deprecated
+	# FIX: Deprecated
 	if [[ ! -f "$MANUAL_LOCK" ]]; then
 		return 1
 	fi
@@ -113,7 +113,7 @@ quit() {
 }
 
 title() {
-  local mode
+	local mode
 	mode=$(echo "$1" | tr '[:lower:]' '[:upper:]')
 	logger "::::::::::::MODE $mode:::::::::::::"
 }

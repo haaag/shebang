@@ -10,12 +10,14 @@ WAKEUP_LOCK="$LOCKS/wakeup.lock"
 MANUAL_LOCK="$LOCKS/manual.lock"
 SLEEP=3s
 
-function logger() {
+logger() {
+	local now
 	if [[ ! -f "$LOGGER" ]]; then
 		create_file "$LOGGER"
 	fi
 
-	echo "$(date '+%F %T')::[$PROG]::$1" | tee -a "$LOGGER"
+	now=$(date '+%F %T')
+	echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
 }
 
 function line() {
