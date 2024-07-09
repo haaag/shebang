@@ -11,6 +11,7 @@ DEPS=(notify-send xdotool pass)
 PASS=$(which pass)
 
 # Vars
+# shellcheck disable=SC2034
 EDITOR="nvim -u NONE"
 TERMINAL=${TERMINAL:-st}
 PASSWORD_STORE_CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-15}
@@ -25,172 +26,172 @@ MAGENTA="#D3869B"
 RED="#FB4934"
 YELLOW="#D79921"
 
-function usage() {
-	cat <<-EOF
-		Usage: $PROG [options]
+function usage {
+    cat <<-EOF
+Usage: $PROG [options]
 
-		options:
-		  -m, --menu    Select password with menu
-		  -e, --edit    Edit selected password
-		  -l, --list    List all passwords
-		  -o, --otp     Copy one-time-password
-		  -t, --type    Password is typed into the terminal
-		  -h, --help    Show this help message and exit
-	EOF
-	exit 0
+options:
+    -m, --menu    Select password with menu
+    -e, --edit    Edit selected password
+    -l, --list    List all passwords
+    -o, --otp     Copy one-time-password
+    -t, --type    Password is typed into the terminal
+    -h, --help    Show this help message and exit
+EOF
+    exit 0
 }
 
-function log_err() {
-	printf "%s: %s\n" "$PROG" "$*" >&2
-	exit 1
+function log_err {
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
 }
 
-function notify() {
-	local mesg command
-	declare -a args
-	mesg="$1"
+function notify {
+    local mesg command
+    declare -a args
+    mesg="$1"
 
-  if command -v "dunstify" >/dev/null; then
-    command="dunstify"
-    args+=(--hints string:x-dunst-stack-tag:pass)
-  else
-    command="notify-send"
-  fi
+    if command -v "dunstify" >/dev/null; then
+        command="dunstify"
+        args+=(--hints string:x-dunst-stack-tag:pass)
+    else
+        command="notify-send"
+    fi
 
-	args+=(--icon dialog-password-symbolic)
-	"$command" "${args[@]}" "$PROG" "$mesg"
+    args+=(--icon dialog-password-symbolic)
+    "$command" "${args[@]}" "$PROG" "$mesg"
 }
 
-function get_password_paths() {
-  local prefix password_files
-	prefix=${PASSWORD_STORE_DIR-~/.password-store}
-	password_files=("$prefix"/**/*.gpg)
-	password_files=("${password_files[@]#"$prefix"/}")
-	password_files=("${password_files[@]%.gpg}")
-	printf '%s\n' "${password_files[@]}"
+function get_password_paths {
+    local prefix password_files
+    prefix=${PASSWORD_STORE_DIR-~/.password-store}
+    password_files=("$prefix"/**/*.gpg)
+    password_files=("${password_files[@]#"$prefix"/}")
+    password_files=("${password_files[@]%.gpg}")
+    printf '%s\n' "${password_files[@]}"
 }
 
-function get_pass_with_menu() {
-	local prompt passwords
-	declare -a passwords=()
-	prompt="${1:-"Pass>"}"
-	MENU_ARGS+=(-p "$prompt")
-	shift
+function get_pass_with_menu {
+    local prompt passwords
+    declare -a passwords=()
+    prompt="${1:-"Pass>"}"
+    MENU_ARGS+=(-p "$prompt")
+    shift
 
-	if [[ -n "$*" && "$MENU" == "dmenu" ]]; then
-		# shellcheck disable=SC2128
-		MENU_ARGS+=("$@")
-	fi
+    if [[ -n "$*" && "$MENU" == "dmenu" ]]; then
+        # shellcheck disable=SC2128
+        MENU_ARGS+=("$@")
+    fi
 
-	mapfile -t passwords < <(get_password_paths)
-	password=$(printf "%s\n" "${passwords[@]}" | "$MENU" "${MENU_ARGS[@]}")
-	echo "$password"
+    mapfile -t passwords < <(get_password_paths)
+    password=$(printf "%s\n" "${passwords[@]}" | "$MENU" "${MENU_ARGS[@]}")
+    echo "$password"
 }
 
-function edit_pwd() {
-	shift
-	local pwd="$1"
+function edit_pwd {
+    shift
+    local pwd="$1"
 
-	if [[ -z "$pwd" ]]; then
-		pwd=$(get_pass_with_menu "PassEdit> " "-sb" "$RED")
-	fi
+    if [[ -z "$pwd" ]]; then
+        pwd=$(get_pass_with_menu "PassEdit> " "-sb" "$RED")
+    fi
 
-	[[ -z $pwd ]] && exit
+    [[ -z $pwd ]] && exit
 
-	$TERMINAL -e "$PASS" edit "$pwd"
-	exit 0
+    $TERMINAL -e "$PASS" edit "$pwd"
+    exit 0
 }
 
-function menu() {
-	local icon pwd
-	icon=""
-	pwd=$(get_pass_with_menu "${icon} Password> " "-sb" "$BLUE")
+function menu {
+    local icon pwd
+    icon=""
+    pwd=$(get_pass_with_menu "${icon} Password> " "-sb" "$BLUE")
 
-	[[ -z "${pwd}" ]] && exit
+    [[ -z "${pwd}" ]] && exit
 
-	"$PASS" show -c "$pwd" 2>/dev/null
-	retcode=$?
+    "$PASS" show -c "$pwd" 2>/dev/null
+    retcode=$?
 
-	if [[ "$retcode" -ne 0 ]]; then
-		notify "No password found for <b>${pwd}</b>"
-		log_err "no password found for '${pwd}'"
-	fi
+    if [[ "$retcode" -ne 0 ]]; then
+        notify "No password found for <b>${pwd}</b>"
+        log_err "no password found for '${pwd}'"
+    fi
 
-	notify "Copied <b>${pwd}</b> to clipboard.\n\nWill clear in 15 seconds."
-	exit 0
+    notify "Copied <b>${pwd}</b> to clipboard.\n\nWill clear in 15 seconds."
+    exit 0
 }
 
-function list_path() {
-	local pwd_path
-	pwd_path=$(get_pass_with_menu "PassList> " "-sb" "$YELLOW")
-	[[ -z "${pwd_path}" ]] && exit
-	echo "$pwd_path"
-	exit 0
+function list_path {
+    local pwd_path
+    pwd_path=$(get_pass_with_menu "PassList> " "-sb" "$YELLOW")
+    [[ -z "${pwd_path}" ]] && exit
+    echo "$pwd_path"
+    exit 0
 }
 
-function otp_code() {
-	local icon pwd mesg
-	icon=""
-	pwd=$(get_pass_with_menu "${icon} PassOTP> " "-sb" "$YELLOW")
+function otp_code {
+    local icon pwd mesg
+    icon=""
+    pwd=$(get_pass_with_menu "${icon} PassOTP> " "-sb" "$YELLOW")
 
-	[[ -z "${pwd}" ]] && exit
+    [[ -z "${pwd}" ]] && exit
 
-	"$PASS" otp -c "${pwd}"
-	retcode=$?
+    "$PASS" otp -c "${pwd}"
+    retcode=$?
 
-	if [[ "$retcode" -gt 0 ]]; then
-		notify "No OTP found for <b>${pwd}</b>"
-		log_err "no OTP found for ${pwd}"
-	fi
+    if [[ "$retcode" -gt 0 ]]; then
+        notify "No OTP found for <b>${pwd}</b>"
+        log_err "no OTP found for ${pwd}"
+    fi
 
-	mesg="Copied OTP code for <b>${pwd}</b> to clipboard.\n\n"
-	mesg+="<i>Will clear in ${PASSWORD_STORE_CLIP_TIME} seconds.</i>"
-	notify "$mesg"
-	exit 0
+    mesg="Copied OTP code for <b>${pwd}</b> to clipboard.\n\n"
+    mesg+="<i>Will clear in ${PASSWORD_STORE_CLIP_TIME} seconds.</i>"
+    notify "$mesg"
+    exit 0
 }
 
-function type_pwd() {
-	shift
-	local pwd="$1"
+function type_pwd {
+    shift
+    local pwd="$1"
 
-	if [[ -z "${pwd}" ]]; then
-		pwd=$(get_pass_with_menu "PassType>" "-sb" "$MAGENTA")
-	fi
+    if [[ -z "${pwd}" ]]; then
+        pwd=$(get_pass_with_menu "PassType>" "-sb" "$MAGENTA")
+    fi
 
-	[[ -z "${pwd}" ]] && exit
+    [[ -z "${pwd}" ]] && exit
 
-	"$PASS" show "$pwd" | {
-		IFS= read -r pass
-		printf %s "$pass"
-	} | $XDOTOOL
-	exit 0
+    "$PASS" show "$pwd" | {
+        IFS= read -r pass
+        printf %s "$pass"
+    } | $XDOTOOL
+    exit 0
 }
 
 if [[ -n $WAYLAND_DISPLAY ]]; then
-	MENU="dmenu-wl"
-	XDOTOOL="ydotool type --file -"
+    MENU="dmenu-wl"
+    XDOTOOL="ydotool type --file -"
 elif [[ -n $DISPLAY ]]; then
-	XDOTOOL="xdotool type --clearmodifiers --file -"
+    XDOTOOL="xdotool type --clearmodifiers --file -"
 else
-	log_err "no wayland or x11 display detected" >&2
+    log_err "no wayland or x11 display detected" >&2
 fi
 
-function main() {
+function main {
 
-	for cmd in "${DEPS[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			log_err "'$cmd' not found"
-		fi
-	done
+    for cmd in "${DEPS[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            log_err "'$cmd' not found"
+        fi
+    done
 
-	case "$1" in
-	-m | --menu) menu ;;
-	-e | --edit) edit_pwd "$@" ;;
-	-l | --list) list_path ;;
-	-o | --otp) otp_code ;;
-	-t | --type) type_pwd "$@" ;;
-	*) usage ;;
-	esac
+    case "$1" in
+    -m | --menu) menu ;;
+    -e | --edit) edit_pwd "$@" ;;
+    -l | --list) list_path ;;
+    -o | --otp) otp_code ;;
+    -t | --type) type_pwd "$@" ;;
+    *) usage ;;
+    esac
 }
 
 main "$@"
