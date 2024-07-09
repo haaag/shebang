@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# Simple bash script for taken screenshot
-# - Pretty mode (add shadow, corner radious, white backdrop)
-# - Normal mode
-# - Full desktop
+# simple bash script for taken screenshot
+# - pretty mode (add shadow, corner radious, white backdrop)
+# - normal mode
+# - full desktop
 #
 # https://github.com/flameshot-org/flameshot
 
@@ -11,134 +11,134 @@ PROG=$(basename "$0")
 DEPENDENCIES=(flameshot convert dunstify nsxiv)
 LOCATION="${XDG_DOWNLOAD_DIR:-$HOME/downloads}"/screenshots
 
-function log_err() {
-	printf "%s: %s\n" "$PROG" "$*" >&2
-	exit 1
+function log_err {
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
 }
 
-function pre_exit() {
-	local image="$1"
+function pre_exit {
+    local image="$1"
 
-	if [[ ! -f "$image" ]]; then
-    log_err "'${image}' not found"
-	fi
+    if [[ ! -f "$image" ]]; then
+        log_err "'${image}' not found"
+    fi
 
-  printf "%s: %s\n" "$PROG" "cleaning up file '${image}'..."
-  rm -f "$image"
-	exit 0
+    printf "%s: %s\n" "$PROG" "cleaning up file '${image}'..."
+    rm -f "$image"
+    exit 0
 }
 
-function notify() {
-	local mesg="$1"
-	dunstify -i flameshot "$PROG" "$mesg"
+function notify {
+    local mesg="$1"
+    dunstify -i flameshot "$PROG" "$mesg"
 }
 
-function open() {
-	local image width height
-	image="$1"
+function open {
+    local image width height
+    image="$1"
 
-	[[ ! -f "${image}" ]] && log_err "'${image}' not found"
+    [[ ! -f "${image}" ]] && log_err "'${image}' not found"
 
-	width=$(identify -format "%w" "$image") >/dev/null
-	height=$(identify -format "%h" "$image") >/dev/null
-	nsxiv --geometry="${width}x${height}" "${image}" 2>/dev/null
+    width=$(identify -format "%w" "$image") >/dev/null
+    height=$(identify -format "%h" "$image") >/dev/null
+    nsxiv --geometry="${width}x${height}" "${image}" 2>/dev/null
 }
 
-function get_last_created() {
-  local image
-	image=$(find "${LOCATION}" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d ' ' -f2-)
-  echo "${image}"
+function get_last_created {
+    local image
+    image=$(find "${LOCATION}" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d ' ' -f2-)
+    echo "${image}"
 }
 
-function pretty() {
-	local filesize image image_tmp
-	image_tmp=$(mktemp --tmpdir "$PROG.XXXXX")
+function pretty {
+    local filesize image image_tmp
+    image_tmp=$(mktemp --tmpdir "$PROG.XXXXX")
 
-	# shellcheck disable=SC2064
-	trap "pre_exit $image_tmp" EXIT
+    # shellcheck disable=SC2064
+    trap "pre_exit $image_tmp" EXIT
 
-	flameshot gui --clipboard --raw >"$image_tmp" 2>/dev/null
+    flameshot gui --clipboard --raw >"$image_tmp" 2>/dev/null
 
-	filesize=$(stat -c%s "$image_tmp")
-	if [[ "$filesize" -le 0 ]]; then
-		echo "$PROG: aborting..."
-		exit 1
-	fi
+    filesize=$(stat -c%s "$image_tmp")
+    if [[ "$filesize" -le 0 ]]; then
+        echo "$PROG: aborting..."
+        exit 1
+    fi
 
-	# add corners
-	convert "$image_tmp" \
-		\( +clone -alpha extract \
-		-draw 'fill black polygon 0,0 0,15 15,0 fill white circle 15,15 15,0' \
-		\( +clone -flip \) -compose Multiply -composite \
-		\( +clone -flop \) -compose Multiply -composite \
-		\) -alpha off -compose CopyOpacity -composite "$image_tmp"
+    # add corners
+    convert "$image_tmp" \
+        \( +clone -alpha extract \
+        -draw 'fill black polygon 0,0 0,15 15,0 fill white circle 15,15 15,0' \
+        \( +clone -flip \) -compose Multiply -composite \
+        \( +clone -flop \) -compose Multiply -composite \
+        \) -alpha off -compose CopyOpacity -composite "$image_tmp"
 
-	# shadow
-	convert "$image_tmp" \
-		\( +clone -background black -shadow 40x5+0+0 \) \
-		+swap -background none -layers merge +repage "$image_tmp"
+    # shadow
+    convert "$image_tmp" \
+        \( +clone -background black -shadow 40x5+0+0 \) \
+        +swap -background none -layers merge +repage "$image_tmp"
 
-	# white backdrop
-	convert "$image_tmp" -bordercolor white -border 10 "$image_tmp"
+    # white backdrop
+    convert "$image_tmp" -bordercolor white -border 10 "$image_tmp"
 
-	# copy image
-	image="${LOCATION}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
-	cp -v "$image_tmp" "${image}"
+    # copy image
+    image="${LOCATION}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
+    cp -v "$image_tmp" "${image}"
 
-	notify "Screenshot saved at <b>${LOCATION}</b>"
-	open "${image}"
+    notify "Screenshot saved at <b>${LOCATION}</b>"
+    open "${image}"
 }
 
-function normal() {
-	local retcode
-	flameshot gui --clipboard --path "${LOCATION}" 2>/dev/null
+function normal {
+    local retcode
+    flameshot gui --clipboard --path "${LOCATION}" 2>/dev/null
 
-	retcode="$?"
-	if [[ "${retcode}" -ne 0 ]]; then
-		exit "${retcode}"
-	fi
+    retcode="$?"
+    if [[ "${retcode}" -ne 0 ]]; then
+        exit "${retcode}"
+    fi
 
-  open "$(get_last_created)"
+    open "$(get_last_created)"
 }
 
-function desktop() {
-	local retcode
-	flameshot full --clipboard --path "${LOCATION}" 2>/dev/null
+function desktop {
+    local retcode
+    flameshot full --clipboard --path "${LOCATION}" 2>/dev/null
 
-	retcode="$?"
-	if [[ "${retcode}" -ne 0 ]]; then
-		exit "${retcode}"
-	fi
+    retcode="$?"
+    if [[ "${retcode}" -ne 0 ]]; then
+        exit "${retcode}"
+    fi
 
-  open "$(get_last_created)"
+    open "$(get_last_created)"
 }
 
-function help() {
-	cat <<-_EOF
-		Usage: $PROG [options]
+function help {
+    cat <<-_EOF
+Usage: $PROG [options]
 
-		options:
-		  -p, --pretty      Add shadow, round corners and white backdrop
-		  -n, --normal      Normal screenshot with flameshot GUI
-		  -d, --desktop     Desktop screenshot
-		  -h, --help        Show this help
-	_EOF
-	exit
+options:
+    -p, --pretty      Add shadow, round corners and white backdrop
+    -n, --normal      Normal screenshot with flameshot GUI
+    -d, --desktop     Desktop screenshot
+    -h, --help        Show this help
+_EOF
+    exit
 }
 
-function main() {
-	for cmd in "${DEPENDENCIES[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			log_err "'$cmd' command not found"
-		fi
-	done
+function main {
+    for cmd in "${DEPENDENCIES[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            log_err "'$cmd' command not found"
+        fi
+    done
 
-	case "$1" in
-	-n | *normal) normal ;;
-	-p | *pretty) pretty ;;
-	-d | *desktop | *full) desktop ;;
-	*) help ;;
-	esac
+    case "$1" in
+    -n | *normal) normal ;;
+    -p | *pretty) pretty ;;
+    -d | *desktop | *full) desktop ;;
+    *) help ;;
+    esac
 }
 
 main "$@"
