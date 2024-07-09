@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+
+PROG=$(basename "$0")
+ALARM="$HOME/.scripts/assets/alarm-beepbeep.mp3"
+DURATION="$1"
+MESG="${2:-Alarm}"
+ICON=""
+
+# files
+PIDFILE="/tmp/$PROG.pid"
+TIMEFILE="/tmp/$PROG.time"
+MPVPID="/tmp/$PROG.mpv"
+
+# TODO:
+# - [ ] Cant stop alarm with `alarm stop`
+# - [ ] Mpv process still running
+
+function pre_exit {
+    printf "%s: %s\n" "$PROG" "cleaning up..."
+    rm -f "$TIMEFILE"
+    rm -f "$PIDFILE"
+    rm -f "$MPVPID"
+    notify "alarm with duration $DURATION finished"
+    exit 0
+}
+
+function usage {
+    printf "Usage: %s <duration> [<name>]\n" "$PROG"
+}
+
+function cancel_timer {
+    local pid
+
+    if [[ -f "$MPVPID" ]]; then
+        local mpvpid
+        mpvpid=$(cat "$MPVPID")
+        kill -9 "$mpvpid" &>/dev/null
+    fi
+
+    if [[ ! -f "$PIDFILE" ]]; then
+        return
+    fi
+
+    pid=$(cat "$PIDFILE")
+    echo "$PROG: timer with pid=$pid cancelled"
+    kill -9 "$pid" &>/dev/null
+
+    pre_exit
+}
+
+function save_pid {
+    echo "$1" | tee "$PIDFILE" >/dev/null
+}
+
+function notify {
+    dunstify -r 888 -i "alarm-timer" "$PROG" "$*"
+}
+
+function save_timestamp {
+    local time="$1"
+    echo "$time" | tee "$TIMEFILE" >/dev/null
+}
+
+function get_timestamp {
+    cat "$TIMEFILE"
+}
+
+function show_status {
+    local current time result
+    local time_diff_hours time_diff_minutes time_diff_seconds
+
+    if [[ ! -f "$TIMEFILE" ]]; then
+        return
+    fi
+
+    current=$(date +%s)
+    time=$(get_timestamp)
+    time_diff=$((time - current))
+
+    if [[ "$time_diff" -lt 0 ]]; then
+        return
+    fi
+
+    time_diff=${time_diff#-}
+
+    if [[ $time_diff -ge 3600 ]]; then
+        time_diff_hours=$((time_diff / 3600))
+        time_diff=$((time_diff % 3600))
+        time_diff_minutes=$((time_diff / 60))
+        time_diff_seconds=$((time_diff % 60))
+        result="${time_diff_hours}h ${time_diff_minutes}m ${time_diff_seconds}s"
+    elif [[ $time_diff -ge 60 ]]; then
+        time_diff_minutes=$((time_diff / 60))
+        time_diff_seconds=$((time_diff % 60))
+        result="${time_diff_minutes}m ${time_diff_seconds}s"
+    else
+        result="${time_diff}s"
+    fi
+
+    echo "$ICON $result"
+}
+
+function interpret_time {
+    local input last_char time
+    if [[ ${#1} -eq 1 ]]; then
+        input="${1}m"
+    else
+        input="$1"
+    fi
+
+    last_char="${input: -1}"
+    time="${input:0:-1}"
+
+    if [[ "$last_char" == "m" ]]; then
+        time=$((time * 60))
+    elif [[ "$last_char" == "s" ]]; then
+        time=$((time))
+    elif [[ "$last_char" == "h" ]]; then
+        time=$((time * 60 * 60))
+    else
+        exit 130
+    fi
+
+    echo "$time"
+}
+
+function sound_the_alarm {
+    notify "alarm with duration=$duration"
+    mpv "$ALARM" --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
+    mpv_pid=$!
+    echo "mpv_pid:::$mpv_pid"
+    echo "$mpv_pid" >"$MPVPID"
+}
+
+function set_alarm {
+    trap pre_exit EXIT SIGTERM
+
+    local duration current current_time
+    duration="$1"
+    current=$(date +%s)
+    duration=$(interpret_time "$duration")
+    current_time=$((current + duration))
+    save_timestamp "$current_time"
+
+    notify "setting alarm for $(show_status)"
+
+    while true; do
+        current=$(date +%s)
+        time=$(get_timestamp)
+        time_diff=$((current - time))
+        time_diff=${time_diff#-}
+        if [[ $time_diff -le 0 ]]; then
+            break
+        fi
+    done
+
+    sound_the_alarm
+}
+
+function get_duration {
+    local icon=""
+    DURATION=$(: | dmenu -i -p "$icon Duration:")
+    echo "$DURATION"
+}
+
+function main {
+    if [[ "${1-}" == "status" ]]; then
+        show_status
+        exit
+    fi
+
+    if [[ "${1-}" =~ ^(cancel|stop|kill)$ ]]; then
+        cancel_timer
+        exit 0
+    fi
+
+    if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+        usage
+        exit 1
+    fi
+
+    if [[ -z "$DURATION" ]]; then
+        DURATION=$(get_duration)
+    fi
+
+    [[ -z "$DURATION" ]] && exit
+
+    if [[ $DURATION =~ ^(cancel|stop|kill)$ ]]; then
+        cancel_timer
+    fi
+
+    pid=$$
+    save_pid "$pid"
+    set_alarm "$DURATION" "$MESG"
+}
+
+main "$@"

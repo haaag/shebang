@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+PROG=$(basename "$0")
+CMD="alarm"
+
+if ! command -v "$CMD" >/dev/null; then
+    printf "%s: %s\n" "$PROG" "$CMD not found"
+    exit 1
+fi
+
+$CMD status
