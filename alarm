@@ -5,6 +5,7 @@ ALARM="$HOME/.scripts/assets/alarm-beepbeep.mp3"
 DURATION="$1"
 MESG="${2:-Alarm}"
 ICON=""
+DEPS=(dunstify dmenu mpv)
 
 # files
 PIDFILE="/tmp/$PROG.pid"
@@ -14,6 +15,33 @@ MPVPID="/tmp/$PROG.mpv"
 # TODO:
 # - [ ] Cant stop alarm with `alarm stop`
 # - [ ] Mpv process still running
+
+function log_err {
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
+}
+
+function notify {
+    dunstify -r 888 -i "alarm-timer" "$PROG" "$*"
+}
+
+function check_deps {
+    for dep in "${DEPS[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            err_msg="'$dep' not found"
+            notify "$err_msg"
+            log_err "$err_msg"
+        fi
+    done
+
+    if [[ ! -f "$ALARM" ]]; then
+        err_msg="alarm file not found: $ALARM"
+        notify "$err_msg"
+        log_err "$err_msg"
+    fi
+
+}
 
 function pre_exit {
     printf "%s: %s\n" "$PROG" "cleaning up..."
@@ -50,10 +78,6 @@ function cancel_timer {
 
 function save_pid {
     echo "$1" | tee "$PIDFILE" >/dev/null
-}
-
-function notify {
-    dunstify -r 888 -i "alarm-timer" "$PROG" "$*"
 }
 
 function save_timestamp {
@@ -164,6 +188,8 @@ function get_duration {
 }
 
 function main {
+    check_deps
+
     if [[ "${1-}" == "status" ]]; then
         show_status
         exit
