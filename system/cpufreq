@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+
+PROG=$(basename "$0")
+POWERSAVE="schedutil"
+PERFORM="performance"
+AVAILABLE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+GOVERNOR=(/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor)
+DEPS=(tlp-stat)
+
+# notification
+NOTI_PERFORM="power-profile-performance-symbolic"
+NOTI_POWERSAVE="power-profile-power-saver-symbolic"
+
+# always ask password
+sudo -k
+
+# colors
+RED=$(tput setaf 1)
+BLUE=$(tput setaf 4)
+MAGENTA=$(tput setaf 5)
+RESET="$(tput sgr0)"
+
+function usage {
+    printf "%s" "\
+usage: $PROG [-s $POWERSAVE] [-p $PERFORM] [stat] [-h help]
+"
+}
+
+function notify {
+    local msg="$1"
+    local icon="${2:-dialog-information}"
+    local hints="string:x-canonical-private-synchronous:cpufreq"
+    dunstify -r 666 -a "$PROG" -i "$icon" -t 3000 "$PROG" "$msg" -h "$hints"
+}
+
+function logme {
+    local msg="$1"
+    local color="$2"
+    printf "%s: %b%s%b\n" "$PROG" "$color" "$msg" "$RESET"
+}
+
+function mode_available {
+    local mode="$1"
+    local scaling_available
+    IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
+
+    for available in "${scaling_available[@]}"; do
+        if [[ "$mode" == "$available" ]]; then
+            logme "mode '${mode}' is available" "$MAGENTA"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+function list_modes {
+    local scaling_available
+    IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
+    logme "available modes"
+    for available in "${scaling_available[@]}"; do
+        printf "  - %b%s%b\n" "$MAGENTA" "$available" "$RESET"
+    done
+}
+
+function set_mode {
+    local mode="$1"
+
+    [[ -z "$mode" ]] && logme "err mode not found" "$RED" && exit 130
+
+    if ! mode_available "$mode"; then
+        logme "mode '$mode' not available" "$RED"
+        list_modes
+        exit 1
+    fi
+
+    echo "$mode" | sudo tee "${GOVERNOR[@]}"
+}
+
+function powersave {
+    set_mode "$POWERSAVE" && notify "🔵 setting to <b>$POWERSAVE</b> mode" "$NOTI_POWERSAVE"
+    logme "setting to $POWERSAVE mode" "$BLUE"
+    show_stats
+}
+
+function performance {
+    set_mode "$PERFORM" && notify "🔴 setting to <b>$PERFORM</b> mode" "$NOTI_PERFORM"
+    logme "setting to $PERFORM mode" "$RED"
+    show_stats
+}
+
+function show_stats {
+    sudo tlp-stat -p
+    exit 0
+}
+
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" >/dev/null; then
+        echo "$PROG: $dep not found"
+        exit 1
+    fi
+done
+
+case "$1" in
+-s | "$POWERSAVE" | save) powersave ;;
+-p | "$PERFORM" | perf) performance ;;
+stat | stats) show_stats ;;
+-l | list) list_modes ;;
+*) usage && exit 0 ;;
+esac
