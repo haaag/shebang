@@ -18,6 +18,7 @@ icon_empty=""
 icon_low=""
 icon_mid=""
 icon_full=""
+icon_unknow=""
 
 notify() {
 	local msg urgency
@@ -76,6 +77,11 @@ get_battery_icon() {
 	icon=""
 	bat_charge="$1"
 
+	if [[ -z "$bat_charge" ]]; then
+		echo "$icon_unknow"
+		return
+	fi
+
 	if [[ "$bat_charge" -lt "20" ]]; then
 		icon="$warn$icon_critical"
 	elif [[ "$bat_charge" -lt "30" ]]; then
@@ -117,12 +123,11 @@ devices_status() {
 		if is_device_connected "$device"; then
 			device_alias=$(get_device_alias "$device")
 			battery=$(get_device_battery "$device")
-      if [[ -z "$battery" ]]; then
-        continue
-      fi
+			if [[ -z "$battery" ]]; then
+				continue
+			fi
 
 			check_battery "$device_alias" "$battery"
-
 			bat_icon=$(get_battery_icon "$battery")
 			device_icon=$(get_device_icon "$device")
 

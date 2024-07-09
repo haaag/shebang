@@ -3,7 +3,7 @@
 # Output: [icon 1.9Gi 25%]
 
 #      
-#     
+#      
 ICON=" "
 
 # The bash shell arithmetic expression ((...)) can't handle floating point.
@@ -28,7 +28,7 @@ function simple_dwm_memory() {
 }
 
 function get_ram() {
-  local total_ram used_ram_bytes percentage_ram used_memory_ram
+	local total_ram used_ram_bytes percentage_ram used_memory_ram
 	total_ram=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
 	used_ram_bytes=$(free --mebi | sed -n '2{p;q}' | awk '{print ($3 / 1024)}')
 	percentage_ram=$(echo "$used_ram_bytes*100/$total_ram" | bc)

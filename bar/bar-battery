@@ -13,6 +13,7 @@
 PROG=$(basename "$0")
 BAT_CHARGE=$(cat /sys/class/power_supply/BAT0/capacity)
 BAT_STATUS=$(cat /sys/class/power_supply/BAT0/status)
+CRITICAL=15
 
 # notification icons
 warn="🔴"
@@ -25,19 +26,18 @@ icon_char=""
 
 function notify() {
 	local args
-  declare -a args=()
+	declare -a args=()
 
-  if ! command -v dunstify >/dev/null 2>&1; then
-    printf "%s: %s\n" "$PROG" "notify-send is not found"
-  fi
+	if ! command -v dunstify >/dev/null 2>&1; then
+		printf "%s: %s\n" "$PROG" "notify-send is not found"
+	fi
 
-  args+=(--appname="Battery" "Battery" "Battery critical: ")
-  args+=(--replace=999)
-  args+=(--icon="battery-level-10-symbolic")
-  args+=(--hints=int:value:"$BAT_CHARGE")
-  args+=(--hints=string:x-canonical-private-synchronous:battery)
-
-  dunstify "${args[@]}"
+	args+=(--appname="Battery" "Battery" "Battery critical: ")
+	args+=(--replace=999)
+	args+=(--icon="battery-level-10-symbolic")
+	args+=(--hints=int:value:"$BAT_CHARGE")
+	args+=(--hints=string:x-canonical-private-synchronous:battery)
+	dunstify "${args[@]}"
 }
 
 function is_charching() {
@@ -74,8 +74,10 @@ function get_icon() {
 }
 
 function main() {
-	if [[ "$BAT_CHARGE" -lt 15 ]]; then
-		notify
+	if ! is_charching; then
+		if [[ "$BAT_CHARGE" -le "$CRITICAL" ]]; then
+			notify
+		fi
 	fi
 
 	printf "%s" "$SEP1"

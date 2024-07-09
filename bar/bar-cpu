@@ -39,12 +39,8 @@ dwm_cpu() {
 	total=$((a + b + c + idle))
 	cpu=$((100 * ((total - prevtotal) - (idle - previdle)) / (total - prevtotal)))
 	printf "%s" "$SEP1"
-	printf "%s  %s%%" "$ICON" "$cpu"
+	printf "%s  %s%%\n" "$ICON" "$cpu"
 	printf "%s" "$SEP2"
 }
 
-if [ "$DWM_COLOR" = true ]; then
-	dwm_cpu_color
-else
-	dwm_cpu
-fi
+dwm_cpu_old

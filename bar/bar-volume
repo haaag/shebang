@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 
 PROG=$(basename "$0")
-CURRENT_VOL=$(pamixer --get-volume)
-DEPS=(pamixer pulsemixer)
 ICON_BAR=""
 ICON_NOTIFY=""
 
+if ! command -v wpctl >/dev/null; then
+	err="'wpctl' not found"
+	printf "%s: %s\n" "$PROG" "$err"
+	notify-send "$PROG" "$err"
+	exit 1
+fi
+
+VOL=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{print $2}')
+VOL=$(awk "BEGIN { printf \"%.0f\n\", $VOL * 100 }")
+
 # bar icons
-#     
 low_icon=""
 mid_icon=""
 high_icon=""
@@ -20,28 +27,28 @@ noti_high_icon="audio-volume-high-symbolic"
 noti_over_icon="audio-volume-overamplified-symbolic"
 noti_muted_icon="audio-volume-muted-symbolic"
 
-check_dependencies() {
-	local cmd err_msg
-	for cmd in "${DEPS[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			err_msg="'$cmd' command not found."
-			notify-send "$PROG" "$err_msg"
-			exit 1
-		fi
-	done
+function is_muted() {
+	local status
+	status=$(wpctl get-volume @DEFAULT_AUDIO_SINK@)
+
+	if [[ "${status}" =~ "MUTED" ]]; then
+		return 0
+	fi
+
+	return 1
 }
 
-function get_icons() {
-	if is_muted || [[ "$CURRENT_VOL" -eq 0 ]]; then
+function load_icons() {
+	if is_muted || [[ "$VOL" -eq 0 ]]; then
 		ICON_BAR="$muted_icon"
 		ICON_NOTIFY="$noti_muted_icon"
-	elif [[ "$CURRENT_VOL" -gt 0 && "$CURRENT_VOL" -le 15 ]]; then
+	elif [[ "$VOL" -gt 0 && "$VOL" -le 15 ]]; then
 		ICON_BAR="$low_icon"
 		ICON_NOTIFY="$noti_low_icon"
-	elif [[ "$CURRENT_VOL" -gt 15 && "$CURRENT_VOL" -le 66 ]]; then
+	elif [[ "$VOL" -gt 16 && "$VOL" -le 65 ]]; then
 		ICON_BAR="$mid_icon"
 		ICON_NOTIFY="$noti_med_icon"
-	elif [[ "$CURRENT_VOL" -gt 66 && "$CURRENT_VOL" -le 100 ]]; then
+	elif [[ "$VOL" -gt 66 && "$VOL" -le 100 ]]; then
 		ICON_BAR="$high_icon"
 		ICON_NOTIFY="$noti_high_icon"
 	else
@@ -50,30 +57,25 @@ function get_icons() {
 	fi
 }
 
-function is_muted() {
-	local muted
-	muted=$(pulsemixer --get-mute)
-
-	if [[ "${muted}" -ne 1 ]]; then
-		return 1
-	fi
-
-	return 0
-}
-
 function notify-vol() {
 	local icon="$1"
 	local appname="Volume"
 	local hints="string:x-canonical-private-synchronous:volume"
-	dunstify -a "$appname" "$appname" "$appname: " -i "$icon" -h int:value:"$CURRENT_VOL" -h "${hints}"
+	dunstify -a "$appname" "$appname" "$appname: " -i "$icon" -h int:value:"$VOL" -h "${hints}"
 }
 
 function main() {
-	check_dependencies
-	get_icons
+	load_icons
+
+	# case 1 in
+	# $((VOL >= 70))) ICON_BAR=$high_icon ICON_NOTIFY=$noti_high_icon ;;
+	# $((VOL >= 30))) ICON_BAR=$mid_icon ICON_NOTIFY=$noti_med_icon ;;
+	# $((VOL >= 1))) ICON_BAR=$low_icon ICON_NOTIFY=$noti_low_icon ;;
+	# *) echo "$muted_icon" && exit ;;
+	# esac
 
 	printf "%s" "$SEP1"
-	printf "%s  %s%%" "$ICON_BAR" "$CURRENT_VOL"
+	printf "%s  %s%%" "$ICON_BAR" "$VOL"
 	printf "%s\n" "$SEP2"
 
 	notify-vol "$ICON_NOTIFY"
