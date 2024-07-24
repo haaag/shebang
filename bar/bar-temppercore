@@ -6,63 +6,64 @@
 PROG=$(basename "$0")
 TARGET="k10temp-pci-00c3"
 UNITS="°C"
-WARN_ICON="🔥"
-MAX_TEMP=80
+WARN_ICON="" #"🔥"
+MAX_TEMP=82
 
-function notify() {
-	local msg="$1"
-	export DISPLAY=":0"
-	dunstify -h string:x-dunst-stack-tag:temppercore -i "cpu" -u critical "$PROG" "$msg"
+function notify {
+    local msg="$1"
+    export DISPLAY=":0"
+    dunstify -h string:x-dunst-stack-tag:temppercore -i "cpu" -u critical "$PROG" "$msg"
 }
 
-function dwm_sensors() {
-	local target="temp1"
-	local sensors_str=$(sensors | grep "$target" | awk '{print $2}' | sed 's/+//')
-	local sensors_int=${sensors_str%.*}
+function dwm_sensors {
+    local target sensors_str sensors_int
+    target="temp1"
+    sensors_str=$(sensors | grep "$target" | awk '{print $2}' | sed 's/+//')
+    sensors_int=${sensors_str%.*}
 
-	if [ "$sensors_int" -ge "$MAX_TEMP" ]; then
-		ICON="$WARN_ICON"
-		notify "${ICON}${sensors_int} is too high"
-	fi
+    if [[ "$sensors_int" -ge "$MAX_TEMP" ]]; then
+        ICON="$WARN_ICON"
+        notify "${ICON}${sensors_int} is too high"
+    fi
 
-	printf "%s" "$SEP1"
-	printf "%s %s%s" "$ICON" "$sensors_int" "$UNITS"
-	printf "%s" "$SEP2"
+    printf "%s" "${SEP1:-}"
+    printf "%s %s%s" "$ICON" "$sensors_int" "$UNITS"
+    printf "%s" "${SEP2:-}"
 }
 
-function get_icon() {
-	local temp="$1"
-	local icon
-	if [[ "${temp}" -ge 20 && "${temp}" -le 40 ]]; then
-		icon=""
-	elif [[ "${temp}" -ge 41 && "${temp}" -le 50 ]]; then
-		icon=""
-	elif [[ "${temp}" -ge 51 && "${temp}" -le 60 ]]; then
-		icon=""
-	elif [[ "${temp}" -ge 61 && "${temp}" -le 70 ]]; then
-		icon=""
-	elif [[ "${temp}" -ge 71 && "${temp}" -le 79 ]]; then
-		icon=""
-	else
-		icon="${WARN_ICON}"
-	fi
-  
-  echo "${icon}"
+function get_icon {
+    local temp="$1"
+    local icon
+    if [[ "${temp}" -ge 20 && "${temp}" -le 40 ]]; then
+        icon=""
+    elif [[ "${temp}" -ge 41 && "${temp}" -le 50 ]]; then
+        icon=""
+    elif [[ "${temp}" -ge 51 && "${temp}" -le 60 ]]; then
+        icon=""
+    elif [[ "${temp}" -ge 61 && "${temp}" -le 70 ]]; then
+        icon=""
+    elif [[ "${temp}" -ge 71 && "${temp}" -le 79 ]]; then
+        icon=""
+    else
+        icon="${WARN_ICON}"
+    fi
+
+    echo "${icon}"
 }
 
-function cpu_temp() {
-	local temp_str temp_int icon
-	temp_str=$(sensors "${TARGET}" | grep 'Tctl' | awk '{print $2}' | sed s/+//)
-	temp_int=${temp_str%.*}
-	icon=$(get_icon "${temp_int}")
+function cpu_temp {
+    local temp_str temp_int icon
+    temp_str=$(sensors "${TARGET}" | grep 'Tctl' | awk '{print $2}' | sed s/+//)
+    temp_int=${temp_str%.*}
+    icon=$(get_icon "${temp_int}")
 
-	if [ "$temp_int" -ge "$MAX_TEMP" ]; then
-		notify "${icon}${temp_str} is too high"
-	fi
+    if [[ "$temp_int" -ge "$MAX_TEMP" ]]; then
+        notify "${icon}${temp_str} is too high"
+    fi
 
-	printf "%s" "$SEP1"
-	printf "%s %s\n" "$icon" "$temp_str"
-	printf "%s" "$SEP2"
+    printf "%s" "$SEP1"
+    printf "%s %s\n" "$icon" "$temp_str"
+    printf "%s" "$SEP2"
 }
 
 cpu_temp

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+ICON=""
+
+function get_swap {
+    local total_swap used_swap_bytes percentage_swap used_memory_swap
+    total_swap=$(free --mebi | sed -n '3{p;q}' | awk '{print ($2 / 1024)}')
+    used_swap_bytes=$(free --mebi | sed -n '3{p;q}' | awk '{print ($3 / 1024)}')
+    percentage_swap=$(echo "$used_swap_bytes*100/$total_swap" | bc)
+    used_memory_swap=$(free -h | sed -n "3s/\([^ ]* *\)\{2\}\([^ ]*\).*/\2/p")
+    printf "%s %s %s%%" "$ICON" "$used_memory_swap" "$percentage_swap"
+}
+
+printf "%s" "$(get_swap)"

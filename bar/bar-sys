@@ -2,185 +2,197 @@
 
 # simple systray for dwmblocks
 
-function is_online() {
-	if ! ping -q -c 1 "www.linux.org" >/dev/null; then
-		return 1
-	fi
+WARN="🔴"
 
-	return 0
+function is_online {
+    if ! ping -q -c 1 "www.linux.org" >/dev/null; then
+        return 1
+    fi
+
+    return 0
 }
 
-function get_interface() {
-	if ! is_online; then
-		printf "%s" ""
-		return
-	fi
+function get_interface {
+    if ! is_online; then
+        printf "%s" ""
+        return
+    fi
 
-	local status count active
-	local ether="eno1"
-	local wlan="wlp2s0"
+    local status count active
+    local ether="eno1"
+    local wlan="wlp2s0"
 
-	declare -A interfaces
-	interfaces["$ether"]="" # "" # ""
-	interfaces["$wlan"]=""  #"" # ""
+    declare -A interfaces
+    interfaces["$ether"]="" # "" # ""
+    interfaces["$wlan"]=""  #"" # ""
 
-	local exclude="loopback"
-	status=$(nmcli device status | grep "$ether\|$wlan")
-	count=$(echo "$status" | grep -c "connected")
+    local exclude="loopback"
+    status=$(nmcli device status | grep "$ether\|$wlan")
+    count=$(echo "$status" | grep -c "connected")
 
-	if [[ "$count" -lt 1 ]]; then
-		printf "%s" ""
-	elif [[ "$count" -eq 1 ]]; then
-		active=$(echo "$status" | grep "connected" | grep -v "$exclude" | awk '{print $1}')
-		printf "%s" "${interfaces[$active]}"
-	else
-		printf "🔴%s" "${interfaces[*]}"
-	fi
+    if [[ "$count" -lt 1 ]]; then
+        printf "%s" ""
+    elif [[ "$count" -eq 1 ]]; then
+        active=$(echo "$status" | grep "connected" | grep -v "$exclude" | awk '{print $1}')
+        printf "%s" "${interfaces[$active]}"
+    else
+        printf "${WARN}%s" "${interfaces[*]}"
+    fi
 }
 
-function get_icons() {
-	icons=(                )
-	icons+=(                )
-	icons+=(         )
-	icons+=(           )
-	icons+=(                 )
-	icons+=(               )
-	icons+=(              )
+function get_icons {
+    icons=(                )
+    icons+=(                )
+    icons+=(         )
+    icons+=(           )
+    icons+=(                 )
+    icons+=(               )
+    icons+=(              )
 }
 
-function get_pomo() {
-	current_timestamp=$(date +%s)
-	pavel=1717476943
-	time_diff_minutes=$(((current_timestamp - pavel) / 60))
-	time_diff_minutes=${time_diff_minutes#-}
-	echo "Time difference: $time_diff_minutes minutes"
+function get_pomo {
+    current_timestamp=$(date +%s)
+    pavel=1717476943
+    time_diff_minutes=$(((current_timestamp - pavel) / 60))
+    time_diff_minutes=${time_diff_minutes#-}
+    echo "Time difference: $time_diff_minutes minutes"
 }
 
-function is_bluetooth_on() {
-	if bluetoothctl show | grep -q "Powered: yes"; then
-		info=$(bluetoothctl info)
-		if [[ $info == *"Missing"* ]]; then
-			printf "%s" ""
-			return
-		fi
+function is_bluetooth_on {
+    if bluetoothctl show | grep -q "Powered: yes"; then
+        info=$(bluetoothctl info)
+        if [[ $info == *"Missing"* ]]; then
+            printf "%s" ""
+            return
+        fi
 
-		printf "%s" ""
-		return
-	fi
+        printf "%s" ""
+        return
+    fi
 }
 
-function is_microphone_on() {
-	local enable=""
-	local disable=""
-	local card=2
-	local mic="Mic"
+function is_microphone_on {
+    local enable=""
+    local disable=""
+    local card=2
+    local mic="Mic"
 
-	amixer -c "$card" get "$mic" &>/dev/null
-	local retcode=$?
-	if [[ "$retcode" -ne 0 ]]; then
-		return
-	fi
+    amixer -c "$card" get "$mic" &>/dev/null
+    local retcode=$?
+    if [[ "$retcode" -ne 0 ]]; then
+        return
+    fi
 
-	local mic_status
-	mic_status=$(amixer -c "$card" get "$mic" | grep "Front Left:" | awk '{print $7}')
+    local mic_status
+    mic_status=$(amixer -c "$card" get "$mic" | grep "Front Left:" | awk '{print $7}')
 
-	if [[ "$mic_status" != "[on]" ]]; then
-		echo "$disable"
-		return
-	fi
+    if [[ "$mic_status" != "[on]" ]]; then
+        echo "$disable"
+        return
+    fi
 
-	echo "$enable"
+    echo "$enable"
 }
 
-function is_cpu_perform() {
-	local icon="" # 
-	local target="performance"
-	governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-	if [[ "$governor" != "$target" ]]; then
-		return
-	fi
-	echo "$icon"
+function is_cpu_perform {
+    local icon="" # 
+    local target="performance"
+    governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+    if [[ "$governor" != "$target" ]]; then
+        return
+    fi
+    echo "$icon"
 }
 
-function is_notifications_on() {
-	if ! pgrep -x dunst >/dev/null; then
-		echo ""
-		return
-	fi
+function is_notifications_on {
+    if ! pgrep -x dunst >/dev/null; then
+        echo ""
+        return
+    fi
 
-	paused=$(dunstctl is-paused)
-	if [[ ! $paused == "false" ]]; then
-		echo ""
-		return
-	fi
+    paused=$(dunstctl is-paused)
+    if [[ ! $paused == "false" ]]; then
+        echo ""
+        return
+    fi
 }
 
-function is_redshift_enable() {
-	local enable=""
-	local enable=""
-	local disable="" # ""
-	# Get the gamma values from xrandr. When redshift isn't on, all values are 1.0.
-	GAMMAX=$(xrandr --verbose | grep 'Gamma' | awk -F ':' '{print $2}' | tr -d ' ')
-	GAMMAY=$(xrandr --verbose | grep 'Gamma' | awk -F ':' '{print $3}' | tr -d ' ')
-	GAMMAZ=$(xrandr --verbose | grep 'Gamma' | awk -F ':' '{print $4}' | tr -d ' ')
-	# Check for at least one value not being 1.0. X appears to stay as 1.0, but Y and Z change.
-	if [[ "$GAMMAX" != 1.0 ]] || [[ "$GAMMAY" != 1.0 ]] || [[ "$GAMMAZ" != 1.0 ]]; then
-		echo "${enable}"
-	else
-		echo "${disable}"
-	fi
+function is_capslock_on {
+    local capslock_on
+    capslock_on=$(xset -q | grep Caps | awk '{print $4}')
+
+    if [[ ! "$capslock_on" == "off" ]]; then
+        echo "${WARN}"
+    fi
 }
 
-function is_running() {
-	local cmd="$1"
-	local enable="$2"
-	local disable="$3"
-
-	if ! pgrep -f "$cmd" >/dev/null; then
-		printf "%s" "$disable"
-	else
-		printf "%s" "$enable"
-	fi
+function is_redshift_enable {
+    local enable=""
+    local enable=""
+    local disable="" # ""
+    # Get the gamma values from xrandr. When redshift isn't on, all values are 1.0.
+    GAMMAX=$(xrandr --verbose | grep 'Gamma' | awk -F ':' '{print $2}' | tr -d ' ')
+    GAMMAY=$(xrandr --verbose | grep 'Gamma' | awk -F ':' '{print $3}' | tr -d ' ')
+    GAMMAZ=$(xrandr --verbose | grep 'Gamma' | awk -F ':' '{print $4}' | tr -d ' ')
+    # Check for at least one value not being 1.0. X appears to stay as 1.0, but Y and Z change.
+    if [[ "$GAMMAX" != 1.0 ]] || [[ "$GAMMAY" != 1.0 ]] || [[ "$GAMMAZ" != 1.0 ]]; then
+        echo "${enable}"
+    else
+        echo "${disable}"
+    fi
 }
 
-function main() {
-	declare -A programs
-	programs["transmission-daemon"]=""
-	programs["alarm"]=""
-	programs["ollama"]="" #"" ""
-	programs["bitwarden"]=""
-	# programs["ytlocal"]=""
-	# programs["tidal-hifi"]=""
-	# programs["mpv"]="" # 
-	# programs["newsboat"]="" # "" ""
-	# programs["xbps-install"]=""
-	# programs["signal-desktop"]="" # ""
-	# programs["nvim"]=""
-	# programs["telegram"]="" # ""
+function is_running {
+    local cmd="$1"
+    local enable="$2"
+    local disable="$3"
 
-	mapfile -t icons < <(get_interface)
-	icons+=("$(is_microphone_on)")
-	icons+=("$(is_bluetooth_on)")
-	# icons+=("$(is_cpu_perform)")
+    if ! pgrep -f "$cmd" >/dev/null; then
+        printf "%s" "$disable"
+    else
+        printf "%s" "$enable"
+    fi
+}
 
-	for prog in "${!programs[@]}"; do
-		icon=${programs[$prog]}
-		icons+=("$(is_running "$prog" "$icon")")
-	done
+function main {
+    declare -A programs
+    programs["transmission-daemon"]=""
+    programs["alarm"]=""
+    programs["ollama"]="" # "" ""
+    programs["bitwarden"]=""
+    programs["tidal-hifi"]=""
+    # programs["ytlocal"]=""
+    # programs["mpv"]="" # 
+    # programs["newsboat"]="" # "" ""
+    # programs["xbps-install"]=""
+    # programs["signal-desktop"]="" # ""
+    # programs["nvim"]=""
+    # programs["telegram"]="" # ""
 
-	# maybe implement option to display fallback icon if proc not running
-	# icons+=("$(is_running "xautolock" "" "")")
-	icons+=("$(is_running "xautolock" "" "")")
-	icons+=("$(is_running "ytlocal" "" "")")
+    mapfile -t icons < <(get_interface)
+    icons+=("$(is_microphone_on)")
+    icons+=("$(is_bluetooth_on)")
+    # icons+=("$(is_cpu_perform)")
 
-	icons+=("$(is_notifications_on)")
-	icons+=("$(is_redshift_enable)")
+    for prog in "${!programs[@]}"; do
+        icon=${programs[$prog]}
+        icons+=("$(is_running "$prog" "$icon")")
+    done
 
-	printf "%s" "$SEP1"
-	for icon in "${icons[@]}"; do
-		[[ -n "$icon" ]] && printf "%s  " "$icon"
-	done
-	printf "%s\n" "$SEP2"
+    # maybe implement option to display fallback icon if proc not running
+    # icons+=("$(is_running "xautolock" "" "")")
+    icons+=("$(is_running "xautolock" "" "")")
+    icons+=("$(is_running "ytlocal" "" "")")
+
+    icons+=("$(is_notifications_on)")
+    icons+=("$(is_redshift_enable)")
+    icons+=("$(is_capslock_on)")
+
+    printf "%s" "$SEP1"
+    for icon in "${icons[@]}"; do
+        [[ -n "$icon" ]] && printf "%s  " "$icon"
+    done
+    printf "%s\n" "$SEP2"
 }
 
 main

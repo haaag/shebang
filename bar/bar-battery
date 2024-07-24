@@ -1,18 +1,10 @@
 #!/usr/bin/env bash
 
-# Output: [ICON  98%]
-# Output: [ICON  98% status]
-#         
-#           
-#        
-#      
-#   
-#   
-# 
+# Output: [UNICODE 98%]
+# Output: [UNICODE 98% status]
 
 PROG=$(basename "$0")
 BAT_CHARGE=$(cat /sys/class/power_supply/BAT0/capacity)
-BAT_STATUS=$(cat /sys/class/power_supply/BAT0/status)
 CRITICAL=15
 
 # notification icons
@@ -24,65 +16,100 @@ icon_mid=""
 icon_full=""
 icon_char=""
 
-function notify() {
-	local args
-	declare -a args=()
+function notify {
+    local args
+    declare -a args=()
 
-	if ! command -v dunstify >/dev/null 2>&1; then
-		printf "%s: %s\n" "$PROG" "notify-send is not found"
-	fi
+    if ! command -v dunstify >/dev/null 2>&1; then
+        printf "%s: %s\n" "$PROG" "notify-send is not found"
+    fi
 
-	args+=(--appname="Battery" "Battery" "Battery critical: ")
-	args+=(--replace=999)
-	args+=(--icon="battery-level-10-symbolic")
-	args+=(--hints=int:value:"$BAT_CHARGE")
-	args+=(--hints=string:x-canonical-private-synchronous:battery)
-	dunstify "${args[@]}"
+    args+=(--appname="Battery" "Battery" "Battery critical: ")
+    args+=(--replace=999)
+    args+=(--urgency=critical)
+    args+=(--icon="battery-level-10-symbolic")
+    args+=(--hints=int:value:"$BAT_CHARGE")
+    args+=(--hints=string:x-canonical-private-synchronous:battery)
+    dunstify "${args[@]}"
 }
 
-function is_charching() {
-	local bat_status
-	bat_status=$(cat /sys/class/power_supply/BAT0/status)
-
-	if [[ "${bat_status}" != "Charging" ]]; then
-		return 1
-	fi
-	return 0
+function status {
+    local current
+    current=$(cat /sys/class/power_supply/BAT0/status)
+    echo "$current"
 }
 
-function get_icon() {
-	local icon=""
-
-	if is_charching; then
-		echo "$icon_char"
-		return
-	fi
-
-	if [[ "$BAT_CHARGE" -lt "20" ]]; then
-		icon="$warn $icon_critical"
-	elif [[ "$BAT_CHARGE" -lt "30" ]]; then
-		icon="$icon_empty"
-	elif [[ "$BAT_CHARGE" -lt "50" ]]; then
-		icon="$icon_low"
-	elif [[ "$BAT_CHARGE" -lt "90" ]]; then
-		icon="$icon_mid"
-	else
-		icon="$icon_full"
-	fi
-
-	echo "$icon"
+function is_charching {
+    if [[ $(status) != "Charging" ]]; then
+        return 1
+    fi
+    return 0
 }
 
-function main() {
-	if ! is_charching; then
-		if [[ "$BAT_CHARGE" -le "$CRITICAL" ]]; then
-			notify
-		fi
-	fi
+function get_charging_bar {
+    # Output: [  50%]
+    #  
+    local icon=""
+    local charge_level=$((BAT_CHARGE / 10))
 
-	printf "%s" "$SEP1"
-	printf "%b %s%%" "$(get_icon)" " $BAT_CHARGE"
-	printf "%s\n" "$SEP2"
+    for i in $(seq 2 9); do
+        if [[ $i -le $charge_level ]]; then
+            icon+=""
+        else
+            icon+=""
+        fi
+    done
+
+    if [[ $charge_level -ge 10 ]]; then
+        icon+=""
+    else
+        icon+=""
+    fi
+
+    echo "$icon"
+}
+
+function get_icon {
+    local icon=""
+    if [[ "$BAT_CHARGE" -lt "20" ]]; then
+        icon="$warn $icon_critical"
+    elif [[ "$BAT_CHARGE" -lt "30" ]]; then
+        icon="$icon_empty"
+    elif [[ "$BAT_CHARGE" -lt "50" ]]; then
+        icon="$icon_low"
+    elif [[ "$BAT_CHARGE" -lt "90" ]]; then
+        icon="$icon_mid"
+    else
+        icon="$icon_full"
+    fi
+    echo "$icon"
+}
+
+function display_charging_bar {
+    printf "%b %b %s%%" "$(get_charging_bar)" "$icon_char" "$BAT_CHARGE"
+}
+
+function display_icon {
+    printf "%b %s%%" "$(get_icon)" " $BAT_CHARGE"
+}
+
+function render_unicodes {
+    printf "%s" "${SEP1:-}"
+    if is_charching; then
+        display_charging_bar
+    else
+        display_icon
+    fi
+    printf "%s\n" "${SEP2:-}"
+}
+
+function main {
+    # if not charging and low charge level critical notification
+    if ! is_charching && [[ "$BAT_CHARGE" -le "$CRITICAL" ]]; then
+        notify
+    fi
+
+    render_unicodes
 }
 
 main
