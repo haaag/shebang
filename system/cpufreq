@@ -4,29 +4,49 @@ set -o errexit
 set -o pipefail
 
 PROG=$(basename "$0")
-POWERSAVE="schedutil"
-PERFORM="performance"
 AVAILABLE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
 GOVERNOR=(/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor)
 DEPS=(tlp-stat)
 
 # notification
-NOTI_PERFORM="power-profile-performance-symbolic"
-NOTI_POWERSAVE="power-profile-power-saver-symbolic"
+NOTI_ICON="power-profile-performance-symbolic"
 
 # always ask password
 sudo -k
 
 # colors
 RED=$(tput setaf 1)
-BLUE=$(tput setaf 4)
 MAGENTA=$(tput setaf 5)
 RESET="$(tput sgr0)"
 
+function help_modes {
+    local scaling_available
+    IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
+    for available in "${scaling_available[@]}"; do
+        printf "    - %s\n" "$available"
+    done
+}
+
 function usage {
-    printf "%s" "\
-usage: $PROG [-s $POWERSAVE] [-p $PERFORM] [stat] [-h help]
-"
+    cat <<-_EOF
+usage: $PROG [OPTIONS]
+
+    Set CPU Frequencies
+
+modes:
+$(help_modes)
+
+options:
+    --set           set mode <MODE>
+    -s, --stats     show stats
+    -h, --help      display this help and exit
+_EOF
+}
+
+function log_err {
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
 }
 
 function notify {
@@ -77,37 +97,46 @@ function set_mode {
         exit 1
     fi
 
+    notify "🔴 setting to <b>$mode</b> mode" "$NOTI_ICON"
+    logme "setting to $mode mode" "$RED"
+
     echo "$mode" | sudo tee "${GOVERNOR[@]}"
-}
-
-function powersave {
-    set_mode "$POWERSAVE" && notify "🔵 setting to <b>$POWERSAVE</b> mode" "$NOTI_POWERSAVE"
-    logme "setting to $POWERSAVE mode" "$BLUE"
-    show_stats
-}
-
-function performance {
-    set_mode "$PERFORM" && notify "🔴 setting to <b>$PERFORM</b> mode" "$NOTI_PERFORM"
-    logme "setting to $PERFORM mode" "$RED"
-    show_stats
 }
 
 function show_stats {
     sudo tlp-stat -p
-    exit 0
 }
 
-for dep in "${DEPS[@]}"; do
-    if ! command -v "$dep" >/dev/null; then
-        echo "$PROG: $dep not found"
-        exit 1
-    fi
-done
+function main {
+    local mode="$1"
 
-case "$1" in
--s | "$POWERSAVE" | save) powersave ;;
--p | "$PERFORM" | perf) performance ;;
-stat | stats) show_stats ;;
--l | list) list_modes ;;
-*) usage && exit 0 ;;
-esac
+    for dep in "${DEPS[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            log_err "$dep not found"
+        fi
+    done
+
+    # show help
+    if [[ "${mode:-}" =~ ^-*h(elp)?$ ]]; then
+        usage
+    fi
+
+    # show stats
+    if [[ "${mode:-}" =~ ^-*s(tats)?$ ]]; then
+        show_stats
+        return 0
+    fi
+
+    # set mode
+    if [[ "${mode:-}" =~ ^-*set?$ ]]; then
+        shift
+        set_mode "$1"
+        return 0
+    fi
+
+    usage
+
+    return 0
+}
+
+main "$@"
