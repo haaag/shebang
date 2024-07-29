@@ -50,6 +50,11 @@ function log_err {
 }
 
 function notify {
+    # check if calling from x11
+    if [[ -z "$DISPLAY" ]]; then
+        return
+    fi
+
     local msg="$1"
     local icon="${2:-dialog-information}"
     local hints="string:x-canonical-private-synchronous:cpufreq"
