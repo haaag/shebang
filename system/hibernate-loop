@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+
+# Script to hibernate/suspend with `zzz/ZZZ`
+#
+# This script monitors specific lock files to manage system hibernation and
+# suspension.
+# It runs continuously in the background, checking for the presence of lock
+# files to determine whether to trigger hibernation or perform other actions.
+
+PROG="${0##*/}"
+LOGGER="${LOGS_PATH:-$HOME/docs/log}/suspend-hibernate.log"
+DEPS=(zzz ZZZ tee)
+
+# lock files
+LOCKS=$HOME
+HIBERNATE_LOCK="$LOCKS/hibernate.lock"
+WAKEUP_LOCK="$LOCKS/wakeup.lock"
+MANUAL_LOCK="$LOCKS/manual.lock"
+SLEEP=5s
+
+# Logs messages with timestamps and script name to the log file.
+function logger {
+    local now
+    if [[ ! -f "$LOGGER" ]]; then
+        create_file "$LOGGER"
+    fi
+
+    now=$(date '+%F %T')
+    echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
+}
+
+# Prints a separator line in the log file.
+function line {
+    local w="79"
+    local char="-"
+    printf "%${w}s\n" | sed "s/ /$char/g"
+}
+
+# Adds a separator line to the log file.
+function separator {
+    line | tee -a "$LOGGER"
+}
+
+# Checks if the manual lock file exists.
+function is_manual_hibernate {
+    if [[ ! -f "$MANUAL_LOCK" ]]; then
+        return 1
+    fi
+
+    logger "found $MANUAL_LOCK"
+    return 0
+}
+
+# Removes a specified lock file and logs the action.
+function remove_lock {
+    local file="$1"
+
+    if [[ ! -f "$file" ]]; then
+        return
+    fi
+
+    rm -f "$file" && logger "removing $file"
+    sleep 0.5
+}
+
+# Creates a specified file and logs the action.
+function create_file {
+    local file="$1"
+    touch "$file"
+    logger "creating $file"
+    sleep 0.3
+}
+
+# Checks if the automatic hibernate lock file exists.
+function is_ready_to_hibernate {
+    if [[ ! -f "$HIBERNATE_LOCK" ]]; then
+        return 1
+    fi
+
+    logger "found $HIBERNATE_LOCK"
+    return 0
+}
+
+# Creates a wakeup lock file and triggers the hibernation process
+# using sudo ZZZ.
+function suspend_hybrid {
+    logger "setting up to after wake-up"
+    create_file "$WAKEUP_LOCK"
+
+    logger "entering hibernate-mode...sudo ZZZ"
+    separator
+    sudo ZZZ
+}
+
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" &>/dev/null; then
+        logger "missing dependency: $dep"
+        exit 1
+    fi
+done
+
+logger "started at $(date)"
+
+while true; do
+    if is_ready_to_hibernate; then
+        remove_lock "$HIBERNATE_LOCK"
+        suspend_hybrid
+    fi
+
+    if is_manual_hibernate; then
+        remove_lock "$MANUAL_LOCK"
+        suspend_hybrid
+    fi
+
+    sleep "$SLEEP"
+done

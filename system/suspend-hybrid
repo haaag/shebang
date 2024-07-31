@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+
+PROG="${0##*/}"
+CURRENT_TIME=$(date +%s)
+LOGGER="${LOGS_PATH:-$HOME/docs/log}/suspend-hibernate.log"
+
+# AC offline in minutes
+HIBERNATE_DELAY=45
+# AC online in minutes
+HIBERNATE_DELAY_CHAR=120
+
+# lock files
+LOCKS=$HOME
+SUSPEND_LOCK="$LOCKS"/suspend.lock
+HIBERNATE_LOCK="$LOCKS/hibernate.lock"
+WAKEUP_LOCK="$LOCKS/wakeup.lock"
+MANUAL_LOCK="$LOCKS/manual.lock"
+TIMER="/tmp/timer.log"
+
+function usage {
+    echo "Usage: $PROG [suspend|resume]"
+    exit 1
+}
+
+function logger {
+    local now
+    if [[ ! -f "$LOGGER" ]]; then
+        create_file "$LOGGER"
+    fi
+
+    now=$(date '+%F %T')
+    echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
+}
+
+function line {
+    local w char
+    w="79"
+    char="-"
+    printf "%${w}s\n" | sed "s/ /$char/g"
+}
+
+function remove_file {
+    local file="$1"
+
+    if [[ ! -f "$file" ]]; then
+        return
+    fi
+
+    rm -f "$file" && logger "removing $file"
+    sleep 0.5
+}
+
+function set_timer {
+    local time
+    time="$1"
+    logger "setting a wake-up timer for $time min"
+    # [mode: no] Don’t suspend, only set the RTC wakeup time.
+    sudo rtcwake --mode no --date "+${time}min"
+    log_to "$((time * 60))" "$TIMER"
+}
+
+function disable_timer {
+    logger "disabling the wake-up timer"
+    sudo rtcwake --mode disable
+}
+
+function create_file {
+    local file="$1"
+    touch "$file"
+    logger "creating $file"
+    sleep 1
+}
+
+function battery_status {
+    local bat_status bat_charge
+    bat_charge=$(cat /sys/class/power_supply/BAT0/capacity)
+    bat_status=$(cat /sys/class/power_supply/BAT0/status)
+
+    echo "$bat_status::${bat_charge}%"
+}
+
+function is_hibernate_mode {
+    if [[ ! -f "$WAKEUP_LOCK" ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+function is_ac_online {
+    # /sys/class/power_supply/AC/online
+    # online == 1 | offline == 0
+    local status
+    status=$(cat /sys/class/power_supply/AC/online)
+    if [[ "$status" = "0" ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+function quit {
+    local code="$1"
+    line | tee -a "$LOGGER"
+    exit "$code"
+}
+
+function title {
+    local mode
+    mode=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+    logger "::::::::::::MODE $mode:::::::::::::"
+}
+
+function log_to {
+    local data="$1"
+    local file="$2"
+    echo "$data" >"$file"
+}
+
+function manual_hibernate {
+    create_file "$MANUAL_LOCK"
+    logger "setting for manual hibernate..."
+    quit 0
+}
+
+function suspend_mode {
+    if is_hibernate_mode; then
+        logger "$WAKEUP_LOCK exists"
+        logger "hibernating..."
+        quit 0
+    fi
+
+    if is_ac_online; then
+        logger "AC is online, update timer to $HIBERNATE_DELAY_CHAR min"
+        HIBERNATE_DELAY=$HIBERNATE_DELAY_CHAR
+    fi
+
+    log_to "$CURRENT_TIME" "$SUSPEND_LOCK"
+    set_timer "$HIBERNATE_DELAY"
+    logger "entering suspend-mode..."
+}
+
+function resume_mode {
+    # Woke up from hibernate
+    if is_hibernate_mode; then
+        remove_file "$WAKEUP_LOCK"
+        logger "waking up from hibernate-mode...yawn"
+        quit 0
+    fi
+
+    # Woke up from suspend
+    suspend_time=$(cat "$SUSPEND_LOCK")
+    timediff=$((CURRENT_TIME - suspend_time))
+    hibernate_delay=$(cat "$TIMER")
+    remove_file "$TIMER"
+    logger "timediff = $timediff"
+    logger "hibernate delay $hibernate_delay seconds"
+
+    # Woke up from timer
+    if [[ "$timediff" -ge "$hibernate_delay" ]]; then
+        logger "waking up from timer"
+        logger "setting up for hibernate-mode"
+        remove_file "$SUSPEND_LOCK"
+        create_file "$HIBERNATE_LOCK"
+        exit 0
+    fi
+
+    # Woke up by user activity
+    logger "waking up by user activity"
+    logger "system suspended for $((timediff / 60)) min"
+    remove_file "$SUSPEND_LOCK"
+    disable_timer
+    logger "waking up from suspend-mode...yawn"
+    separator
+}
+
+function main {
+    local mode="$1"
+
+    if [[ ! "$mode" =~ ^(suspend|resume|manual)$ ]]; then
+        usage
+    fi
+
+    title "$mode"
+    logger "battery::$(battery_status)"
+
+    case "$mode" in
+    suspend) suspend_mode ;;
+    resume) resume_mode ;;
+    manual) manual_hibernate ;;
+    *) usage ;;
+    esac
+
+    quit 0
+}
+
+main "$@"
