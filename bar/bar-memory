@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Script for displaying memory usage in dwm bar.
+#
 # Output: [icon 1.9Gi 25%]
 
 #      
@@ -9,31 +11,31 @@ ICON=" "
 # The bash shell arithmetic expression ((...)) can't handle floating point.
 [[ -z "$(which bc)" ]] && echo "bc command not found." && exit 1
 
-function dwm_memory() {
-	total=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
-	used_bytes=$(free --mebi | sed -n '2{p;q}' | awk '{print ($3 / 1024)}')
-	percentage=$(echo "$used_bytes*100/$total" | bc)
-	used_memory=$(free -h | sed -n "2s/\([^ ]* *\)\{2\}\([^ ]*\).*/\2/p")
+function dwm_memory {
+    total=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
+    used_bytes=$(free --mebi | sed -n '2{p;q}' | awk '{print ($3 / 1024)}')
+    percentage=$(echo "$used_bytes*100/$total" | bc)
+    used_memory=$(free -h | sed -n "2s/\([^ ]* *\)\{2\}\([^ ]*\).*/\2/p")
 
-	printf "%s" "$SEP1"
-	printf "%s %s %s%%" "$ICON" "$used_memory" "$percentage"
-	printf "%s\n" "$SEP2"
+    printf "%s" "${SEP1:-}"
+    printf "%s %s %s%%" "$ICON" "$used_memory" "$percentage"
+    printf "%s\n" "${SEP2:-}"
 }
 
-function simple_dwm_memory() {
-	mem=$(free -h | awk '/Mem:/ { print $3 }' | cut -f1 -d 'i')
-	printf "%s" "$SEP1"
-	printf "%s %s" "$ICON" "$mem"
-	printf "%s\n" "$SEP2"
+function simple_dwm_memory {
+    mem=$(free -h | awk '/Mem:/ { print $3 }' | cut -f1 -d 'i')
+    printf "%s" "$SEP1"
+    printf "%s %s" "$ICON" "$mem"
+    printf "%s\n" "$SEP2"
 }
 
-function get_ram() {
-	local total_ram used_ram_bytes percentage_ram used_memory_ram
-	total_ram=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
-	used_ram_bytes=$(free --mebi | sed -n '2{p;q}' | awk '{print ($3 / 1024)}')
-	percentage_ram=$(echo "$used_ram_bytes*100/$total_ram" | bc)
-	used_memory_ram=$(free -h | sed -n "2s/\([^ ]* *\)\{2\}\([^ ]*\).*/\2/p")
-	printf "%s %s %s%%" "$ICON" "$used_memory_ram" "$percentage_ram"
+function get_ram {
+    local total_ram used_ram_bytes percentage_ram used_memory_ram
+    total_ram=$(free --mebi | sed -n '2{p;q}' | awk '{print ($2 / 1024)}')
+    used_ram_bytes=$(free --mebi | sed -n '2{p;q}' | awk '{print ($3 / 1024)}')
+    percentage_ram=$(echo "$used_ram_bytes*100/$total_ram" | bc)
+    used_memory_ram=$(free -h | sed -n "2s/\([^ ]* *\)\{2\}\([^ ]*\).*/\2/p")
+    printf "%s %s %s%%" "$ICON" "$used_memory_ram" "$percentage_ram"
 }
 
-printf "%s" "$(get_ram)"
+printf "%s\n" "$(get_ram)"

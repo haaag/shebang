@@ -1,59 +1,66 @@
 #!/usr/bin/env bash
 
+# ╻ ╻╻┏━┓
+# ┃╻┃┃┣━┛
+# ┗┻┛╹╹
+#
+# Script for displaying audio status in dwm bar.
+#
 # Output: ${NORMAL} || ${MUTED} || ""
+
 EXTERNAL_MIC=(2 Mic)
 NORMAL=""
 MUTED=""
 
-function mic_is_connected() {
-	local channel mic
-	channel="$1"
-	mic="$2"
+function mic_is_connected {
+    local channel mic
+    channel="$1"
+    mic="$2"
 
-	amixer -c "$channel" get "$mic" &>/dev/null
-	exit_status=$?
-	if [[ $exit_status -eq 0 ]]; then
-		return 0
-	fi
+    amixer -c "$channel" get "$mic" &>/dev/null
+    exit_status=$?
+    if [[ $exit_status -eq 0 ]]; then
+        return 0
+    fi
 
-	return 1
+    return 1
 }
 
-function power_on() {
-	local channel mic
-	channel="$1"
-	mic="$2"
+function power_on {
+    local channel mic
+    channel="$1"
+    mic="$2"
 
-	if ! mic_is_connected "$channel" "$mic"; then
-		exit 1
-	fi
+    if ! mic_is_connected "$channel" "$mic"; then
+        exit 1
+    fi
 
-	mic_status=$(amixer -c "$channel" get "$mic" | grep "Front Left:" | awk '{print $7}')
-	if [[ "$mic_status" == "[on]" ]]; then
-		return 0
-	fi
+    mic_status=$(amixer -c "$channel" get "$mic" | grep "Front Left:" | awk '{print $7}')
+    if [[ "$mic_status" == "[on]" ]]; then
+        return 0
+    fi
 
-	return 1
+    return 1
 }
 
-function main() {
-	local output=""
+function main {
+    local output=""
 
-	if ! command -v amixer >/dev/null; then
-		printf "%s: %s\n" "$(basename "$0")" "'amixer' not found"
-		exit 1
-	fi
+    if ! command -v amixer >/dev/null; then
+        printf "%s: %s\n" "$(basename "$0")" "'amixer' not found"
+        exit 1
+    fi
 
-	if mic_is_connected "${EXTERNAL_MIC[@]}"; then
-		if power_on "${EXTERNAL_MIC[@]}"; then
-			output="$output $NORMAL"
-		else
-			output="$output $MUTED"
-		fi
-	fi
-	printf "%s" "$SEP1"
-	printf "%s" "$output"
-	printf "%s" "$SEP2"
+    if mic_is_connected "${EXTERNAL_MIC[@]}"; then
+        if power_on "${EXTERNAL_MIC[@]}"; then
+            output="$output $NORMAL"
+        else
+            output="$output $MUTED"
+        fi
+    fi
+    printf "%s" "${SEP1:-}"
+    printf "%s" "$output"
+    printf "%s" "${SEP2:-}"
 }
 
 main

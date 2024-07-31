@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Script for displaying battery status in dwm bar.
+#
 # Output: [UNICODE 98%]
 # Output: [UNICODE 98% status]
 

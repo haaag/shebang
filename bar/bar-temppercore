@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Script for displaying core temperature in dwm bar.
+#
 # Output: [icon 55°C]
 
 # icons:      

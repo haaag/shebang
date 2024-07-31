@@ -1,31 +1,8 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
+# Script for displaying current time in dwm bar.
+#
 # Output: [ICON 16:12]
 
 icon=""
-dwm_time=$(date "+%H:%M")
-BLUE="#83a598"
-
-_time() {
-	printf "%s" "$SEP1"
-	printf "%s %s" "$icon" "$dwm_time"
-	printf "%s\n " "$SEP2"
-}
-
-dwm_time_color() {
-	color="^c${BLUE}^"
-	reset_color="^d^"
-	printf "%s" "$SEP1"
-	printf "%s%s %s %s" "$color" "$icon" "$reset_color" "$dwm_time"
-	printf "%s\n" "$SEP2"
-}
-
-case $BLOCK_BUTTON in
-1) notify-send "This Month" "$(cal | sed "s/\<$(date +'%e' | sed 's/ //g')\>/<b><span color='red'>&<\/span><\/b>/")" && notify-send "Appointments" "$(calcurse -d3)" ;;
-2) setsid -f "$TERMINAL" -e calcurse ;;
-3) notify-send "📅 Time/date module" "\- Left click to show upcoming appointments for the next three days via \`calcurse -d3\` and show the month via \`cal\`
-- Middle click opens calcurse if installed" ;;
-6) setsid -f "$TERMINAL" -e "$EDITOR" "$0" ;;
-esac
-
-_time
+printf "%s%s %s%s\n" "${SEP1:-}" "$icon" "$(date "+%H:%M")" "${SEP2:-}"

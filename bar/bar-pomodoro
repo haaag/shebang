@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Script for displaying pomodoro status in dwm bar.
+#
+# Output: [ICON time]
+
 PROG=$(basename "$0")
 CMD="alarm"
 
