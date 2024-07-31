@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# ╻  ┏━┓┏━╸┏━┓
+# ┃  ┃ ┃┃╺┓┗━┓
+# ┗━╸┗━┛┗━┛┗━┛
+
+PROG=$(basename "$0")
+LOGS_PATH=${LOGS_PATH:-$HOME/docs/log}
+TERMINAL=${TERMINAL:-st}
+LOGS_FILES=("$LOGS_PATH"/*)
+
+declare -a LOGS_NAMES
+
+for log in "${LOGS_FILES[@]}"; do
+    name=$(basename "${log}")
+    LOGS_NAMES+=("${name}")
+done
+
+log=$(printf '%s\n' "${LOGS_NAMES[@]}" | dmenu -l 10 -p "${PROG}>")
+
+[[ -z "${log}" ]] && exit 1
+
+$TERMINAL -n splogs -c splogs -g 120x30 -e nvim "${LOGS_PATH}/${log}"

@@ -18,6 +18,7 @@ repos:
     rev: 2.1.1
     hooks:
       - id: bashate
+        args: [--ignore=E006]
         name: bashate
         description: This hook runs bashate for linting shell scripts
         entry: bashate

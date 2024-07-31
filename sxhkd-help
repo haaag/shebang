@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# ┏━┓╻ ╻╻ ╻╻┏ ╺┳┓   ╻ ╻┏━╸╻  ┏━┓
+# ┗━┓┏╋┛┣━┫┣┻┓ ┃┃╺━╸┣━┫┣╸ ┃  ┣━┛
+# ┗━┛╹ ╹╹ ╹╹ ╹╺┻┛   ╹ ╹┗━╸┗━╸╹
+
+PROG=$(basename "$0")
+CMD="sxhkd"
+PROMPT="  $CMD>"
+SXHKDRC="${XDG_CONFIG_HOME:-$HOME/.config}/$CMD/sxhkdrc"
+
+# menu
+MENU="${1:-dmenu}"
+declare -a MENU_ARGS=(-l 15)
+
+function log_err {
+    notify-send -i dialog-error-symbolic "$PROG" "$*"
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
+}
+
+if ! command -v "$CMD" >/dev/null; then
+    log_err "$CMD not found"
+fi
+
+if [[ ! -f "$SXHKDRC" ]]; then
+    log_err "$SXHKDRC not found"
+fi
+
+if [[ "$MENU" == "dmenu" ]]; then
+    MENU_ARGS+=(-i -p "$PROMPT")
+else
+    MENU="rofi"
+    MENU_ARGS+=(-dmenu -theme-str "window {width: 75%; height: 50%;}")
+    MENU_ARGS+=(-p "$PROMPT")
+fi
+
+awk '/^[a-z]/ && last {print $0,"\t",last} {last=""} /^#/{last=$0}' "$SXHKDRC" |
+    column -t -s $'\t' |
+    "$MENU" "${MENU_ARGS[@]}"

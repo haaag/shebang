@@ -44,8 +44,8 @@ function get_icons {
     icons=(                )
     icons+=(                )
     icons+=(         )
-    icons+=(           )
-    icons+=(                 )
+    icons+=(          )
+    icons+=(                 )
     icons+=(               )
     icons+=(              )
 }
@@ -188,11 +188,11 @@ function main {
     icons+=("$(is_redshift_enable)")
     icons+=("$(is_capslock_on)")
 
-    printf "%s" "$SEP1"
+    printf "%s" "${SEP1:-}"
     for icon in "${icons[@]}"; do
         [[ -n "$icon" ]] && printf "%s  " "$icon"
     done
-    printf "%s\n" "$SEP2"
+    printf "%s\n" "${SEP2:-}"
 }
 
 main

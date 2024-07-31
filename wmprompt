@@ -1,45 +1,47 @@
 #!/bin/env bash
 
-# Simple bash script for system prompt.
-# Dependencies: dmenu, dwm, slock
+# simple bash script for system prompt.
+# dependencies: dmenu, dwm, slock
 
 PROG=$(basename "$0")
 DEPS=(dmenu dwm slock)
 OPTS=(" Lock" "⏾ Suspend" " Hibernate" " Logout")
 OPTS+=(" Reboot" " PowerOff" " RestartWM" " DisplayOff")
+XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-dwm}
 
-lod_err_exit() {
-	printf "%s: %s\n" "$PROG" "$*" >&2
-	exit 1
+function lod_err_exit {
+    notify-send "$PROG" "$*"
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
 }
 
-print_stdout() {
-	printf "%s: %s\n" "$PROG" "$*"
+function print_stdout {
+    printf "%s: %s\n" "$PROG" "$*"
 }
 
-main() {
-	local uptime chosen
+function main {
+    local uptime chosen
 
-	for cmd in "${DEPS[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			lod_err_exit "'$cmd' command not found."
-		fi
-	done
+    for cmd in "${DEPS[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            lod_err_exit "'$cmd' command not found."
+        fi
+    done
 
-	uptime=$(uptime -p | sed -e 's/up //g')
-	chosen=$(printf "%s\n" "${OPTS[@]}" | dmenu -h 22 -i -p "$(hostname): $uptime")
+    uptime=$(uptime -p | sed -e 's/up //g')
+    chosen=$(printf "%s\n" "${OPTS[@]}" | dmenu -h 22 -i -p "$(hostname): $uptime")
 
-	case "$chosen" in
-	*Lock) print_stdout "locking screen with slock" && slock ;;
-	*Suspend) print_stdout "suspending system with zzz" && sudo zzz ;;
-	*Hibernate) print_stdout "hibernating system with ZZZ" && suspend-hybrid.sh manual ;;
-	*Logout) print_stdout "logging out" && pkill -x Xorg ;;
-	*RestartWM) print_stdout "restarting dwm" && pkill -x dwm ;;
-	*Reboot) print_stdout "rebooting system" && sudo reboot ;;
-	*PowerOff) print_stdout "powering off system" && sudo -A poweroff ;;
-	*DisplayOff) print_stdout "powering off display" && xset dpms force off ;;
-	*) exit ;;
-	esac
+    case "$chosen" in
+    *Lock) print_stdout "locking screen with slock" && slock ;;
+    *Suspend) print_stdout "suspending system with zzz" && sudo zzz ;;
+    *Hibernate) print_stdout "hibernating system with ZZZ" && suspend-hybrid manual ;;
+    *Logout) print_stdout "logging out" && pkill -x Xorg ;;
+    *RestartWM) print_stdout "restarting dwm" && pkill -x "$XDG_CURRENT_DESKTOP" ;;
+    *Reboot) print_stdout "rebooting system" && sudo reboot ;;
+    *PowerOff) print_stdout "powering off system" && sudo -A poweroff ;;
+    *DisplayOff) print_stdout "powering off display" && xset dpms force off && slock ;;
+    *) exit ;;
+    esac
 }
 
 main

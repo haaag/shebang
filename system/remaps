@@ -4,65 +4,91 @@ PROG=$(basename "$0")
 LAYOUT="us"
 DEPS=(setxkbmap xset)
 VARIANT="altgr-intl"
-SETXKB=/usr/bin/setxkbmap
+SETXKB=$(which setxkbmap)
 ICON=""
 
-logme() {
-	printf "%s: %s\n" "$PROG" "$1"
+function logme {
+    printf "%s: %s\n" "$PROG" "$1"
 }
 
-log_exit() {
-	printf "%s: %s\n" "$PROG" "$1" >&2
-	exit 1
+function log_exit {
+    printf "%s: %s\n" "$PROG" "$1" >&2
+    exit 1
 }
 
-set_rules() {
-	local retcode
+function set_normal_rules {
+    local retcode
+    $SETXKB -rules evdev \
+        -model evdev \
+        -layout "${LAYOUT}" \
+        -variant "${VARIANT}" \
+        -option caps:swapescape \
+        -option compose:ralt
 
-	$SETXKB -rules evdev \
-		-model evdev \
-		-layout "${LAYOUT}" \
-		-variant "${VARIANT}" \
-		-option caps:swapescape \
-		-option compose:ralt
-
-	retcode=$?
-	if [[ $retcode -ne 0 ]]; then
-		log_exit "setxkbmap failed"
-	fi
-
-	xset r rate 200 50
-	# xset r rate 300 50
-	# xset r rate 250 44
+    retcode=$?
+    if [[ $retcode -ne 0 ]]; then
+        log_exit "setxkbmap failed"
+    fi
 }
 
-get_xkbmap() {
-	local current
-	current=$($SETXKB -query | grep "layout\|variant" | awk '{print $2}' | paste -sd "_")
-	echo "$current"
+function set_rule_esc_and_ctrl {
+    local retcode
+    $SETXKB -rules evdev \
+        -model evdev \
+        -layout "${LAYOUT}" \
+        -variant "${VARIANT}" \
+        -option ctrl:nocaps
+
+    retcode=$?
+    if [[ $retcode -ne 0 ]]; then
+        log_exit "setxkbmap failed"
+    fi
+
+    xcape -e 'Control_L=Escape'
 }
 
-bar_output() {
-	local current
-	current=$(get_xkbmap)
-	printf "%b %s" "$ICON" "$current"
+function set_rate {
+    xset r rate 200 50
+    # xset r rate 300 50
+    # xset r rate 250 44
 }
 
-main() {
-	for dep in "${DEPS[@]}"; do
-		if ! command -v "${dep}" >/dev/null; then
-			log_exit "'${dep}' not found"
-		fi
-	done
+function get_xkbmap {
+    local current
+    current=$($SETXKB -query | grep "layout\|variant" | awk '{print $2}' | paste -sd "_")
+    echo "$current"
+}
 
-	if [[ "$(get_xkbmap)" == "${LAYOUT}_$VARIANT" ]]; then
-		log_exit "already in layout='${LAYOUT}' variant='$VARIANT'"
-	fi
+function bar_output {
+    local current
+    current=$(get_xkbmap)
+    printf "%b %s" "$ICON" "$current"
+}
 
-	logme "setting -> ${LAYOUT}_$VARIANT"
-	set_rules
+function main {
+    for dep in "${DEPS[@]}"; do
+        if ! command -v "${dep}" >/dev/null; then
+            log_exit "'${dep}' not found"
+        fi
+    done
 
-	exit 0
+    logme "setting -> ${LAYOUT}_$VARIANT"
+
+    case "$1" in
+    alternative)
+        set_rule_esc_and_ctrl
+        set_rate
+        ;;
+    bar) bar_output ;;
+    *)
+        set_normal_rules
+        set_rate
+        ;;
+    esac
+
+    set_normal_rules
+    set_rate
+    exit 0
 }
 
 main "$@"

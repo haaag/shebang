@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+# ┏━╸┏━┓╻ ╻┏━╸┏━┓┏━╸┏━┓
+# ┃  ┣━┛┃ ┃┣╸ ┣┳┛┣╸ ┃┓┃
+# ┗━╸╹  ┗━┛╹  ╹┗╸┗━╸┗┻┛
+#
+# Utility designed to manage CPU frequency scaling
+#   - Displays available scaling modes
+#   - Displays current scaling governor
+#   - Sets the CPU scaling mode
+#
+# Deps:
+#   - tlp-stat, notify-send, tput
+
 set -o errexit
 set -o pipefail
 
@@ -16,6 +28,7 @@ sudo -k
 
 # colors
 RED=$(tput setaf 1)
+BLUE=$(tput setaf 4)
 MAGENTA=$(tput setaf 5)
 RESET="$(tput sgr0)"
 
@@ -33,13 +46,14 @@ usage: $PROG [OPTIONS]
 
     Set CPU Frequencies
 
-modes:
+available:
 $(help_modes)
 
 options:
-    --set           set mode <MODE>
-    -s, --stats     show stats
-    -h, --help      display this help and exit
+    -s, --set           Set mode <MODE>
+    -S, --stats         Display stats
+    -c, --current       Display current governor
+    -h, --help          Display this help and exit
 _EOF
 }
 
@@ -58,12 +72,12 @@ function notify {
     local msg="$1"
     local icon="${2:-dialog-information}"
     local hints="string:x-canonical-private-synchronous:cpufreq"
-    dunstify -r 666 -a "$PROG" -i "$icon" -t 3000 "$PROG" "$msg" -h "$hints"
+    notify-send -r 666 -a "$PROG" -i "$icon" -t 3000 "$PROG" "$msg" -h "$hints"
 }
 
 function logme {
     local msg="$1"
-    local color="$2"
+    local color="${2:-$BLUE}"
     printf "%s: %b%s%b\n" "$PROG" "$color" "$msg" "$RESET"
 }
 
@@ -79,10 +93,13 @@ function mode_available {
         fi
     done
 
+    logme "mode '$mode' not available" "$RED"
+    mode_list
+
     return 1
 }
 
-function list_modes {
+function mode_list {
     local scaling_available
     IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
     logme "available modes"
@@ -91,29 +108,43 @@ function list_modes {
     done
 }
 
-function set_mode {
+function mode_check {
     local mode="$1"
 
     [[ -z "$mode" ]] && logme "err mode not found" "$RED" && exit 130
 
     if ! mode_available "$mode"; then
-        logme "mode '$mode' not available" "$RED"
-        list_modes
-        exit 1
+        return 1
     fi
 
-    notify "🔴 setting to <b>$mode</b> mode" "$NOTI_ICON"
-    logme "setting to $mode mode" "$RED"
+    return 0
+}
 
-    echo "$mode" | sudo tee "${GOVERNOR[@]}"
+function mode_set {
+    shift
+    local mode="$1"
+
+    if ! mode_check "$mode"; then
+        return 1
+    fi
+
+    logme "setting to '$mode' mode" "$BLUE"
+    echo "$mode" | sudo tee "${GOVERNOR[@]}" >/dev/null
+    notify "🔴 setting to <b>$mode</b> mode" "$NOTI_ICON"
 }
 
 function show_stats {
     sudo tlp-stat -p
 }
 
+function show_current {
+    local governor
+    governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+    logme "$governor"
+}
+
 function main {
-    local mode="$1"
+    local arg="$1"
 
     for dep in "${DEPS[@]}"; do
         if ! command -v "$dep" >/dev/null; then
@@ -121,25 +152,12 @@ function main {
         fi
     done
 
-    # show help
-    if [[ "${mode:-}" =~ ^-*h(elp)?$ ]]; then
-        usage
-    fi
-
-    # show stats
-    if [[ "${mode:-}" =~ ^-*s(tats)?$ ]]; then
-        show_stats
-        return 0
-    fi
-
-    # set mode
-    if [[ "${mode:-}" =~ ^-*set?$ ]]; then
-        shift
-        set_mode "$1"
-        return 0
-    fi
-
-    usage
+    case "$arg" in
+    -s | *set) mode_set "$@" ;;
+    -c | *current) show_current ;;
+    -S | *stats) show_stats ;;
+    *) usage ;;
+    esac
 
     return 0
 }

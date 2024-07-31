@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+# ┏━╸┏━┓┏━┓╻┏ ┏┓ ┏━┓┏━┓╻┏
+# ┃  ┃ ┃┃ ┃┣┻┓┣┻┓┃ ┃┃ ┃┣┻┓
+# ┗━╸┗━┛┗━┛╹ ╹┗━┛┗━┛┗━┛╹ ╹
+#
+# Script to open my recipes in zathura
+
+PROG=$(basename "$0")
+ROOT="$HOME/docs/vimwiki/cookbook/"
+TMP="/tmp"
+TERMINAL=${TERMINAL:-st}
+DEPS=(pandoc zathura find)
+
+declare -a COOKS
+readarray -t COOKS < <(find "$ROOT" -type f -name "*.md" -exec basename {} \;)
+
+function log_err {
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
+}
+
+function list_recipes {
+    local recipe
+    recipe=$(printf "%s\n" "${COOKS[@]}" | dmenu -l 10 -p "cookbook>")
+    echo "$recipe"
+}
+
+function select_recipe {
+    local recipe
+    recipe=$(list_recipes)
+
+    [[ -z "${recipe}" ]] && exit 1
+
+    echo "$recipe"
+}
+
+function convert_recipe {
+    local filepath filename pdf
+    filepath="$1"
+    filename=$(basename "$filepath")
+    pdf="${TMP}/${filename%%.md}.pdf"
+
+    # if [[ ! -f "${pdf}" ]]; then
+    # 	pandoc --from=markdown --to=pdf "${filepath}" --output="${pdf}"
+    # fi
+
+    pandoc --from=markdown --to=pdf "${filepath}" --output="${pdf}"
+    echo "$pdf"
+}
+
+function open_recipe {
+    local recipe
+    recipe=$(select_recipe)
+    file=$(find "$ROOT" -type f -name "${recipe}")
+    pdf=$(convert_recipe "${file}")
+
+    if [[ ! -f "${pdf}" ]]; then
+        printf "%s: %s\n" "$PROG" "pdf file '${pdf}' not found"
+        exit 1
+    fi
+
+    zathura "$pdf"
+}
+
+function edit_recipe {
+    local recipe
+    recipe=$(select_recipe)
+    $TERMINAL -e nvim "${ROOT}/${recipe}"
+}
+
+function redo_recipe {
+    local recipe
+    recipe=$(select_recipe)
+    file=$(find "$ROOT" -type f -name "${recipe}")
+    convert_recipe "${file}"
+}
+
+function usage {
+    cat <<-_EOF
+Usage: $PROG [options]
+
+Options:
+    -e, --edit    edit recipe
+    -r, --redo    convert recipe
+    -o, --open    open recipe
+    -h, --help    display this help and exit
+_EOF
+}
+
+function main {
+    local recipe
+    local arg="$1"
+
+    for cmd in "${DEPS[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            log_err "'$cmd' not found"
+        fi
+    done
+
+    case "$arg" in
+    -h | *help) usage ;;
+    -e | *edit) edit_recipe ;;
+    -r | redo) redo_recipe ;;
+    *) open_recipe "${recipe}" ;;
+    esac
+}
+
+main "$@"

@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+
+# ╺┳╸┏━┓┏━╸┏━╸╻  ┏━╸
+#  ┃ ┃ ┃┃╺┓┃╺┓┃  ┣╸
+#  ╹ ┗━┛┗━┛┗━┛┗━╸┗━╸
+#
+# Script to toggle services
+
+PROG=$(basename "$0")
+DEPS=(dunst redshift)
+NOTIFYID=999
+
+function log_err {
+    printf "%s: %s\n" "$PROG" "$1" >&2
+    exit 1
+}
+
+function usage {
+    cat <<-_EOF
+Usage: $PROG [options]
+
+Options:
+    -r, redshift   Toggle redshift
+    -d, dunst      Toggle dunst
+_EOF
+    exit
+}
+
+function toggle_microphone {
+    # off="mic-off"
+    # ready="mic-ready"
+    # muted="microphone-sensitivity-muted"
+    # senHigh="microphone-sensitivity-high"
+    # senLow="microphone-sensitivity-low"
+    # senMed="microphone-sensitivity-medium"
+
+    log_err "NotImplementedErr"
+}
+
+function logme {
+    printf "%s: %s\n" "$PROG" "$1"
+}
+
+function notify {
+    local msg="$1"
+    local icon="${2:-dialog-information}"
+    local hints="string:x-canonical-private-synchronous:microphone"
+    dunstify -r "$NOTIFYID" -a "$PROG" -i "$icon" -t 3000 "$PROG" "$msg" -h "${hints}"
+}
+
+function toggle_redshift {
+    local msg
+    if pgrep -x redshift >/dev/null; then
+        msg="toggle redshit"
+        logme "$msg"
+        notify "$msg"
+        pkill -USR1 redshift
+    fi
+}
+
+function toggle_dunst {
+    if [[ "$(dunstctl is-paused)" == "true" ]]; then
+        logme "dunst enabled" && notify "<b>dunst</b> enable" "bell"
+    else
+        logme "dunst disable"
+    fi
+    dunstctl set-paused toggle
+}
+
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" >/dev/null; then
+        log_err "$dep not found"
+    fi
+done
+
+case "$1" in
+-r | red | redshift) toggle_redshift ;;
+-d | dunst) toggle_dunst ;;
+-h | --help | help) usage ;;
+*) notify "unknown option '${1:-empty}'" && usage ;;
+esac

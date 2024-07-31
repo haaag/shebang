@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+#
+# Void linux
+# https://docs.voidlinux.org/xbps/index.html
+#
+# The X Binary Package System
+# Fast package manager that has been designed and implemented from scratch.
+# XBPS is managed by the Void Linux team and developed at
+# https://github.com/void-linux/xbps.
+
+set -o errexit
+set -o pipefail
+
+# Always ask for password
+sudo -k
+
+# xbps-query -p install-date -s '' | sort -k2
+# xbps-query -p install-date -s '' | sort -t: -k2 | column -t -s: -o: | grep -e "${1:-.}"
+
+PROG=$(basename "$0")
+DEPS=(fzf)
+LOGGER="${LOGS_PATH:-$HOME/docs/log/}/void.log"
+BULLET="\u2022"
+
+# Icons
+declare -A ICONS
+ICONS[install]="" # ""
+ICONS[search]=""
+ICONS[update]=""
+ICONS[uninstall]=""
+ICONS[clean]=""
+ICONS[query]=""
+ICONS[help]=""
+ICONS[exit]=""
+
+# Menu options
+install="${ICONS[install]} install"
+search="${ICONS[search]} search"
+update="${ICONS[update]} update"
+uninstall="${ICONS[uninstall]} uninstall"
+clean="${ICONS[clean]} clean"
+query="${ICONS[query]} query"
+help="${ICONS[help]} help"
+exit="${ICONS[exit]} exit"
+
+# Style
+BOLD=$(tput bold)
+DIM=$(tput dim)
+RESET="$(tput sgr0)"
+# Colors
+BLUE=$(tput setaf 4)
+RED=$(tput setaf 1)
+CYAN=$(tput setaf 6)
+YELLOW=$(tput setaf 3)
+MAGENTA=$(tput setaf 5)
+WHITE=$(tput setaf 7)
+
+function notification {
+    local icon="dialog-error-symbolic.svg"
+    notify-send --icon="$icon" "$1" "$2"
+}
+
+function logger {
+    from="${1:-LOG}"
+    shift
+    mesg="$*"
+    date=$(date +"%Y-%m-%d::%H:%M:%S")
+    echo "[$date]::[$PROG]::[$from]::${mesg}" | tee -a "${LOGGER}" >/dev/null
+}
+
+function title {
+    # printf "\n"
+    # echo -e "${BOLD}${FG_BLUE}Void${RESET} $1"
+    printf "\n%b%bVoid%b %s\n\n" "${BOLD}" "${BLUE}" "${RESET}" "${1}"
+    # printf "\n"
+}
+
+function dependencies {
+    for cmd in "${DEPS[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            err_msg="'$cmd' command not found."
+            notification "$PROG script" "$err_msg"
+            title "$err_msg"
+            exit 1
+        fi
+    done
+}
+
+function preview {
+    for i in "$@"; do
+        version=${i##*-}
+        pkg=${i%-*}
+        echo -e " ${BULLET} ${MAGENTA}${pkg}${RESET} ${DIM}${version}${RESET}"
+    done
+    echo
+}
+
+function warning {
+    for i in "$@"; do
+        version=${i##*-}
+        pkg=${i%-*}
+        echo -e " ${BULLET}${RED} ${pkg}${RESET} ${DIM}${version}${RESET}"
+    done
+    echo
+}
+
+function mdate {
+    printf "\n"
+    echo -e "${MAGENTA} xbps ${RESET} ${WHITE} helper $RESET"
+}
+
+function get_installed_pkgs {
+    packages=$(xbps-query -s "")
+    echo "$packages"
+}
+
+function get_all_pkgs {
+    packages=$(xbps-query -Rs "*")
+    echo "$packages"
+}
+
+function update {
+    title "${BLUE}Syncing repositories${RESET}"
+    sudo xbps-install -Su
+}
+
+function install {
+    local selected query
+    query="${1-""}" selected=$(xbps-query -Rs "$query" | awk '{print $2}' | fzf \
+        --multi \
+        --prompt="Select packages> " \
+        --marker=" " \
+        --preview='xbps-query -R {}' \
+        --border-label=" Available Packages " \
+        --preview-label='[ Package Information ]' \
+        --preview-label-pos='0:bottom')
+
+    if [[ -z "$selected" ]]; then
+        exit 1
+    fi
+
+    title "${CYAN}Install${RESET}"
+    # shellcheck disable=SC2086
+    preview $selected
+    # shellcheck disable=SC2086
+    sudo xbps-install -Su $selected
+    # shellcheck disable=SC2086
+    logger "INSTALL		" $selected
+}
+
+function uninstall {
+    local pkg_name selected query
+    query="${1-""}"
+    pkgs=$(get_installed_pkgs)
+    # pkg_name=$(get_installed_pkgs | awk '{ print $2 }')
+    pkg_name=$(echo "$pkgs" | awk '{ print $2 }')
+    selected=$(echo "$pkg_name" | fzf \
+        --multi \
+        --prompt="Select packages> " \
+        --marker=" " \
+        --preview='xbps-query -f {}' \
+        --preview-label='[ Package Information ]' \
+        --query="$query" \
+        --preview-label-pos='0:bottom')
+
+    if [[ -z "$selected" ]]; then
+        exit 1
+    fi
+
+    title "${RED}Uninstalling packages${RESET}"
+    # shellcheck disable=SC2086
+    warning $selected
+    # shellcheck disable=SC2086
+    sudo xbps-remove -R $selected
+    # shellcheck disable=SC2086
+    logger "UNINSTALL	" $selected
+}
+
+function search {
+    # TODO: Improve display.
+    # [ ] pkg name and version separated
+    # [ ] pkg description new line
+    query="${1-""}"
+    title "${YELLOW}Search${RESET}"
+    selected=$(
+        xbps-query -Rs "$query" | awk '{print $2}' | fzf \
+            --preview='xbps-query -R {}' \
+            --preview-label='[ Package Information ]'
+    )
+}
+
+function query {
+    local selected
+    selected=$(xbps-query -l | awk '{ print $2 }' | fzf \
+        --preview='xbps-query -f {}' \
+        --preview-label='[ Package Files ]' \
+        --preview-label-pos='0:bottom')
+
+    if [[ -z "$selected" ]]; then
+        exit 1
+    fi
+
+    xbps-query -f "$selected"
+}
+
+function clean {
+    title "${CYAN}Cleaning obsolete binary packages and orphans packages${RESET}"
+    sudo xbps-remove -Oo
+}
+
+function show_log {
+    ${EDITOR:-vim} "${LOGGER}"
+}
+
+function usage {
+    cat <<-_EOF
+Usage: $PROG [command]
+
+XBPS helper for Void Linux
+
+Commands:
+    -u, update          Syncs repositories
+    -i, install         Install packages
+    -U, uninstall       Uninstall packages
+    -s, search          Search packages
+    -q, query           Query packages
+    -c, clean           Clean obsolete/orphans
+    -l, log             Show log
+    -h, help            Show this help
+_EOF
+    exit
+}
+
+function menu {
+    local options
+    declare -a options
+
+    options+=("$install")
+    options+=("$search")
+    options+=("$update")
+    options+=("$uninstall")
+    options+=("$clean")
+    options+=("$query")
+    options+=("$help")
+    options+=("$exit")
+
+    command=$(printf '%s\n' "${options[@]}" | fzf \
+        --layout=reverse-list \
+        --height=45% \
+        --border=sharp \
+        --prompt="${PROG}> " \
+        --pointer='→' \
+        --ansi \
+        --no-preview)
+
+    (printf '%s\n' "${options[@]}" | grep -x -q "$command") &&
+        main "$(echo "$command" | cut -d' ' -f2)"
+}
+
+function main {
+    dependencies
+
+    case "$1" in
+    -u | update) update ;;
+    -i | install) shift && install "$@" ;;
+    -U | uninstall) shift && uninstall "$@" ;;
+    -q | query) shift && query "$@" ;;
+    -s | search) shift && search "$@" ;;
+    -c | clean) clean ;;
+    -l | log) show_log ;;
+    -h | help) usage ;;
+    exit) exit 0 ;;
+    *) menu ;;
+    esac
+}
+
+if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+    usage
+fi
+
+main "$@"
