@@ -9,7 +9,7 @@
 
 PROG=$(basename "$0")
 DEPENDENCIES=(flameshot convert dunstify nsxiv)
-LOCATION="${XDG_DOWNLOAD_DIR:-$HOME/downloads}"/screenshots
+LOCATION="${XDG_PICTURES_DIR:-$HOME/shares/pic}"/screenshots
 
 function log_err {
     printf "%s: %s\n" "$PROG" "$*" >&2
