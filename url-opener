@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+# ╻ ╻┏━┓╻
+# ┃ ┃┣┳┛┃
+# ┗━┛╹┗╸┗━╸
+#
+# Simple script to open URLs with different programs
+
+PROG="${0##*/}"
+declare -a DEPS=(mpv pybrowsers tuiropen xclip ytmpv)
+declare -a OPTS=(browsers copy mpv ytmpv img)
+
+function log_err {
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
+}
+
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" >/dev/null; then
+        log_err "'$dep' command not found."
+    fi
+done
+
+function mympv {
+    socket="${MPVSOCKET:-/tmp/mpvsocket}"
+    setsid -f mpv --input-ipc-server="$socket" -quiet --loop "$1" >/dev/null 2>&1 &
+}
+
+function open_ytmpv {
+    local url
+    url=$(xclip -selection clipboard -o)
+    ytmpv "$url"
+}
+
+function choose_action {
+    local arg="$1"
+
+    CHOSEN=$(printf "%s\n" "${OPTS[@]}" | dmenu -h 20 -i -p "openWith>")
+    [[ -z $CHOSEN ]] && exit
+
+    case "$CHOSEN" in
+    browsers) setsid pybrowsers --verbose --url "$arg" & ;;
+    copy) echo -e "$arg" | xclip -selection clipboard -r ;;
+    mpv) mympv "$arg" & ;;
+    ytmpv) open_ytmpv "$arg" ;;
+    img) tuiropen "$arg" & ;;
+    *) exit ;;
+    esac
+
+    exit 0
+}
+
+function main {
+    local arg="$1"
+    [[ -z $arg ]] && {
+        echo "Usage: $PROG <url>"
+        exit 1
+    }
+
+    case "$arg" in
+    *preview.redd.it* | *v.redd.it* | *i.imgur.com* | *reddit.com/gallery* | *png* | *gif* | *jpeg* | *jpg*) setsid -f tuiropen "$arg" ;;
+    *youtu.be* | *youtube.com/watch* | *youtube.com/playlist* | *youtube.com/shorts*) setsid -f ytmpv "$arg" ;;
+    *) choose_action "$arg" ;;
+    esac
+
+    exit 0
+}
+
+main "$@"
