@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+
+# ┏┓ ╻ ╻┏━┓┏┓╻╻┏━┓┏━┓
+# ┣┻┓┃ ┃┣┳┛┃┗┫┃┗━┓┃ ┃
+# ┗━┛┗━┛╹┗╸╹ ╹╹┗━┛┗━┛
+#
+# script for burning iso images to usb devices using `dd`
+
+PROG="${0##*/}"
+DEPS=(fdisk dd realpath)
+declare -a ARGS=(bs=4M status=progress oflag=sync)
+
+# colors
+BLUE=$(tput setaf 4)
+CYAN=$(tput setaf 6)
+GRAY=$(tput setaf 8)
+GREEN=$(tput setaf 2)
+RED=$(tput setaf 1)
+YELLOW=$(tput setaf 3)
+
+# style
+BOLD=$(tput bold)
+NC="$(tput sgr0)"
+
+function usage {
+    printf "usage: %s <iso> <device>\n" "$PROG"
+}
+
+function logerr {
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
+}
+
+function confirm {
+    local answer
+    echo -n "Are you sure you want to continue? ${GRAY}[y/N]:${NC} "
+    read -r answer
+
+    case "$answer" in
+    y | Y) return 0 ;;
+    n | N) return 1 ;;
+    *) return 1 ;;
+    esac
+}
+
+function show_dev_info {
+    local device="$1"
+
+    [[ -z "$device" ]] && {
+        usage
+        logerr "err device not provided"
+    }
+
+    if [[ ! -b "$device" ]]; then
+        logerr "invalid device: '$device'"
+    fi
+
+    echo -e "${GREEN}${BOLD}$device${NC} information\n"
+    if ! sudo fdisk -l "$device"; then
+        return 1
+    fi
+
+    return 0
+}
+
+function show_warning {
+    echo -en "\n${YELLOW}${BOLD}Warning${NC}:"
+    echo -e "${RED}${BOLD} device will be completely overwritten!${NC}\n"
+}
+
+function getsize {
+    local file="$1"
+
+    if [[ ! -f "$file" ]]; then
+        logerr "file not found: '$file'"
+    fi
+
+    size=$(du -b "$file" | awk '{printf "%.1f", $1 / (1024 * 1024) / 1024}')
+    echo "${size}GB"
+}
+
+function show_status {
+    local iso="$1"
+    local device="$2"
+
+    echo "${GREEN}${BOLD}Status:${NC}"
+    echo "  ${CYAN}${BOLD}Device:${NC}  ${BOLD}$device${NC}"
+    echo "  ${BLUE}${BOLD}Path:${NC}    $(dirname "$iso")"
+    echo "  ${YELLOW}${BOLD}Image:${NC}   $(basename "$iso")"
+    echo -e "  ${BLUE}${BOLD}Size:${NC}    $(getsize "$iso")\n"
+}
+
+function burn {
+    local iso="$1"
+    local device="$2"
+
+    if ! show_dev_info "$device"; then
+        exit 1
+    fi
+
+    show_warning
+    show_status "$iso" "$device"
+
+    if ! confirm; then
+        exit 1
+    fi
+
+    ARGS+=(if="$iso")
+    ARGS+=(of="$device")
+    sudo dd "${ARGS[@]}"
+
+    return 0
+}
+
+function format {
+    local device="$1"
+
+    read -p "New volume label: " -r label
+    sudo mkfs.ext4 "$device" -L "${label:-}"
+}
+
+function erase_dev {
+    local device="$1"
+    declare -a args=(bs=1M status=progress)
+
+    if ! confirm; then
+        return 1
+    fi
+
+    args+=(if=/dev/zero)
+    args+=(of="$device")
+    sudo dd "${args[@]}"
+
+    return 0
+}
+
+function wipe {
+    local device="$1"
+
+    if ! show_dev_info "$device"; then
+        exit 1
+    fi
+
+    show_warning
+
+    if ! erase_dev "$device"; then
+        return 1
+    fi
+
+    format "$device"
+    return 0
+}
+
+function main {
+    local iso="$1"
+    local device="$2"
+
+    for dep in "${DEPS[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            logerr "'$dep' not found"
+        fi
+    done
+
+    [[ -z "$iso" ]] && {
+        usage
+        exit 1
+    }
+
+    case "$iso" in
+    --format)
+        wipe "$device"
+        exit
+        ;;
+    *) ;;
+    esac
+
+    iso=$(realpath "$iso")
+
+    if [[ ! -f "$iso" ]]; then
+        logerr "file not found: '$iso'"
+    fi
+
+    burn "$iso" "$device"
+}
+
+main "$@"
