@@ -62,7 +62,7 @@ function log_err {
 }
 
 function log_err_and_exit {
-    printf "%s: %s\n" "$PROG" "$msg" >&2
+    printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
 }
 
@@ -126,6 +126,31 @@ function delay_exit {
         read -n 1 -s -r -p "Press any key to continue"
         echo -e "\n"
     fi
+}
+
+function send_notification {
+    local notify_cmd="dunstify"
+    local icon="alarm-timer"
+    declare -a notify_args=(--replace="888" --icon="$icon" "${PROG:-"no-name"}")
+
+    if ! command -v "$notify_cmd" >/dev/null; then
+        notify_cmd="notify-send"
+        unset "notify_args[0]"
+    fi
+
+    "$notify_cmd" "${notify_args[@]}" "$*"
+}
+
+function confirm {
+    local answer
+    echo -n "Are you sure you want to continue? ${GRAY}[y/N]:${NC} "
+    read -r answer
+
+    case "$answer" in
+    y | Y) return 0 ;;
+    n | N) return 1 ;;
+    *) return 1 ;;
+    esac
 }
 
 # Only in ZSH

@@ -5,7 +5,6 @@
 # Output: [UNICODE 98%]
 # Output: [UNICODE 98% status]
 
-PROG=$(basename "$0")
 BAT_CHARGE=$(cat /sys/class/power_supply/BAT0/capacity)
 CRITICAL=15
 
@@ -18,21 +17,15 @@ icon_mid=""
 icon_full=""
 icon_char=""
 
-function notify {
+function send_notification {
     local args
-    declare -a args=()
-
-    if ! command -v dunstify >/dev/null 2>&1; then
-        printf "%s: %s\n" "$PROG" "notify-send is not found"
-    fi
-
-    args+=(--appname="Battery" "Battery" "Battery critical: ")
-    args+=(--replace=999)
-    args+=(--urgency=critical)
-    args+=(--icon="battery-level-10-symbolic")
-    args+=(--hints=int:value:"$BAT_CHARGE")
-    args+=(--hints=string:x-canonical-private-synchronous:battery)
-    dunstify "${args[@]}"
+    local cmd=notify-send
+    declare -a args=(-a "Battery" "Battery" "Battery critical: ")
+    args+=(-r 999 --urgency=critical)
+    args+=(-i "battery-level-10-symbolic")
+    args+=(-h int:value:"$BAT_CHARGE")
+    args+=(-h string:x-canonical-private-synchronous:battery)
+    "$cmd" "${args[@]}"
 }
 
 function status {
@@ -52,7 +45,8 @@ function get_charging_bar {
     # Output: [  50%]
     #  
     local icon=""
-    local charge_level=$((BAT_CHARGE / 10))
+    local charge_level
+    charge_level=$((BAT_CHARGE / 10))
 
     for i in $(seq 2 9); do
         if [[ $i -le $charge_level ]]; then
@@ -108,7 +102,7 @@ function render_unicodes {
 function main {
     # if not charging and low charge level critical notification
     if ! is_charching && [[ "$BAT_CHARGE" -le "$CRITICAL" ]]; then
-        notify
+        send_notification
     fi
 
     render_unicodes

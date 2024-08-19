@@ -61,17 +61,22 @@ function load_icons {
     fi
 }
 
-function notify-vol {
+function send_notification {
     local icon="$1"
+    local cmd=notify-send
     local appname="Volume"
-    local hints="string:x-canonical-private-synchronous:volume"
-    dunstify -a "$appname" "$appname" "$appname: " -i "$icon" -h int:value:"$VOL" -h "${hints}"
+
+    declare -a notify_args=(-a "$appname" "$appname: ")
+    notify_args+=(-i "$icon")
+    notify_args+=(-h int:value:"$VOL")
+    notify_args+=(-h "string:x-canonical-private-synchronous:volume")
+    "$cmd" "${notify_args[@]}"
 }
 
 function main {
     load_icons
     printf "%s%s  %s%%%s\n" "${SEP1:-}" "$ICON_BAR" "$VOL" "${SEP2:-}"
-    notify-vol "$ICON_NOTIFY"
+    send_notification "$ICON_NOTIFY"
 }
 
 main

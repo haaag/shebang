@@ -40,7 +40,7 @@ function choose_action {
     [[ -z $CHOSEN ]] && exit
 
     case "$CHOSEN" in
-    browsers) setsid pybrowsers --verbose --url "$arg" & ;;
+    browsers) setsid -f pybrowsers --verbose --url "$arg" ;;
     copy) echo -e "$arg" | xclip -selection clipboard -r ;;
     mpv) mympv "$arg" & ;;
     ytmpv) open_ytmpv "$arg" ;;

@@ -7,7 +7,7 @@ LOGGER="${LOGS_PATH:-$HOME/docs/log}/suspend-hibernate.log"
 # AC offline in minutes
 HIBERNATE_DELAY=45
 # AC online in minutes
-HIBERNATE_DELAY_CHAR=120
+HIBERNATE_DELAY_CHAR=60
 
 # lock files
 LOCKS=$HOME

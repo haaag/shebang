@@ -4,33 +4,18 @@
 #
 # Output: [icon 55°C]
 
-# icons:      
+# icons:     
 PROG=$(basename "$0")
 TARGET="k10temp-pci-00c3"
-UNITS="°C"
-WARN_ICON="" #"🔥"
-MAX_TEMP=82
+WARN_ICON="🔥" # ""
+MAX_TEMP=90
 
-function notify {
+function send_notification {
     local msg="$1"
     export DISPLAY=":0"
-    dunstify -h string:x-dunst-stack-tag:temppercore -i "cpu" -u critical "$PROG" "$msg"
-}
-
-function dwm_sensors {
-    local target sensors_str sensors_int
-    target="temp1"
-    sensors_str=$(sensors | grep "$target" | awk '{print $2}' | sed 's/+//')
-    sensors_int=${sensors_str%.*}
-
-    if [[ "$sensors_int" -ge "$MAX_TEMP" ]]; then
-        ICON="$WARN_ICON"
-        notify "${ICON}${sensors_int} is too high"
-    fi
-
-    printf "%s" "${SEP1:-}"
-    printf "%s %s%s" "$ICON" "$sensors_int" "$UNITS"
-    printf "%s" "${SEP2:-}"
+    declare -a notify_args=(-h string:x-dunst-stack-tag:temppercore)
+    notify_args+=(-i "cpu" -u critical)
+    notify-send "${notify_args[@]}" "$PROG" "$msg"
 }
 
 function get_icon {
@@ -60,12 +45,12 @@ function cpu_temp {
     icon=$(get_icon "${temp_int}")
 
     if [[ "$temp_int" -ge "$MAX_TEMP" ]]; then
-        notify "${icon}${temp_str} is too high"
+        send_notification "${icon}${temp_str} is too high"
     fi
 
-    printf "%s" "$SEP1"
+    printf "%s" "${SEP1:-}"
     printf "%s %s\n" "$icon" "$temp_str"
-    printf "%s" "$SEP2"
+    printf "%s" "${SEP2:-}"
 }
 
 cpu_temp

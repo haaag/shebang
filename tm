@@ -67,7 +67,7 @@ function main {
     local magnet="${2:-$subcommand}"
 
     case "$subcommand" in
-    -s | start) setsid "$CMD" && logme "$CMD started" ;;
+    -s | start) setsid -f "$CMD" && logme "$CMD started" ;;
     -k | kill) pkill -f "$CMD" && logme "$CMD stopped" ;;
     -a | add) add_transmission "$magnet" ;;
     -h | help)

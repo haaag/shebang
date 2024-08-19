@@ -8,8 +8,8 @@
 # https://github.com/flameshot-org/flameshot
 
 PROG=$(basename "$0")
-DEPENDENCIES=(flameshot convert dunstify nsxiv)
-LOCATION="${XDG_PICTURES_DIR:-$HOME/shares/pic}"/screenshots
+DEPENDENCIES=(flameshot convert nsxiv)
+DEF_LOCATION="${XDG_PICTURES_DIR:-$HOME/shares/pic}"/screenshots
 
 function log_err {
     printf "%s: %s\n" "$PROG" "$*" >&2
@@ -30,7 +30,15 @@ function pre_exit {
 
 function notify {
     local mesg="$1"
-    dunstify -i flameshot "$PROG" "$mesg"
+    local cmd
+
+    if command -v dunstify >/dev/null; then
+        cmd=dunstify
+    else
+        cmd=notify-send
+    fi
+
+    "$cmd" -i flameshot "$PROG" "$mesg"
 }
 
 function open {
@@ -46,7 +54,7 @@ function open {
 
 function get_last_created {
     local image
-    image=$(find "${LOCATION}" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d ' ' -f2-)
+    image=$(find "${DEF_LOCATION}" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d ' ' -f2-)
     echo "${image}"
 }
 
@@ -82,16 +90,16 @@ function pretty {
     convert "$image_tmp" -bordercolor white -border 10 "$image_tmp"
 
     # copy image
-    image="${LOCATION}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
+    image="${DEF_LOCATION}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
     cp -v "$image_tmp" "${image}"
 
-    notify "Screenshot saved at <b>${LOCATION}</b>"
+    notify "Screenshot saved at <b>${DEF_LOCATION}</b>"
     open "${image}"
 }
 
 function normal {
     local retcode
-    flameshot gui --clipboard --path "${LOCATION}" 2>/dev/null
+    flameshot gui --clipboard --path "${DEF_LOCATION}" 2>/dev/null
 
     retcode="$?"
     if [[ "${retcode}" -ne 0 ]]; then
@@ -103,14 +111,26 @@ function normal {
 
 function desktop {
     local retcode
-    flameshot full --clipboard --path "${LOCATION}" 2>/dev/null
+    local filename
 
+    shift
+    local path="$1"
+
+    if [[ -n "$path" ]]; then
+        path=$(realpath "$path")
+    else
+        path=$DEF_LOCATION
+    fi
+
+    filename="${path}/$(date +%Y-%m-%d_%H:%M:%S)_desktop.png"
+
+    flameshot full --clipboard --path "$filename" 2>/dev/null
     retcode="$?"
     if [[ "${retcode}" -ne 0 ]]; then
         exit "${retcode}"
     fi
 
-    open "$(get_last_created)"
+    open "$filename"
 }
 
 function help {
@@ -136,7 +156,7 @@ function main {
     case "$1" in
     -n | *normal) normal ;;
     -p | *pretty) pretty ;;
-    -d | *desktop | *full) desktop ;;
+    -d | *desktop | *full) desktop "$@" ;;
     *) help ;;
     esac
 }

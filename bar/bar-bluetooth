@@ -21,17 +21,21 @@ icon_full=""
 icon_unknow=""
 
 function notify {
-    local msg urgency
-    msg="$1"
-    urgency="$2"
+    local msg="$1"
+    local urgency="$2"
+    local cmd="notify-send"
     export DISPLAY=":0"
-    dunstify -h string:x-dunst-stack-tag:bluetooth -i "battery-low-symbolic" -u "$urgency" "$PROG" "$msg"
+
+    if command -v dunstify >/dev/null; then
+        cmd="dunstify"
+    fi
+
+    "$cmd" -h string:x-dunst-stack-tag:bluetooth -i "battery-low-symbolic" -u "$urgency" "$PROG" "$msg"
 }
 
 function check_battery {
-    local device_alias battery
-    device_alias="$1"
-    battery="$2"
+    local device_alias="$1"
+    local battery="$2"
     if [[ "$battery" -le 10 ]] && [[ "$battery" != "" ]]; then
         msg="$device_alias battery is low ${warn} ${icon_critical}${battery}%"
         echo "$msg" | tee -a "$LOGGER"
@@ -115,16 +119,17 @@ function get_device_icon {
 }
 
 function devices_status {
-    local device_counter devices_output
-    device_counter=0
+    local device_counter=0
     mapfile -t paired_devices < <(bluetoothctl devices | grep Device | cut -d ' ' -f 2)
 
     for device in "${paired_devices[@]}"; do
         if is_device_connected "$device"; then
+            local device_alias battery bat_icon device_icon string devices_output
+
             device_alias=$(get_device_alias "$device")
             battery=$(get_device_battery "$device")
             if [[ -z "$battery" ]]; then
-                continue
+                battery="-"
             fi
 
             check_battery "$device_alias" "$battery"
@@ -138,9 +143,10 @@ function devices_status {
             else
                 devices_output+=$string
             fi
-            ((device_counter++))
+            device_counter=$((device_counter + 1))
         fi
     done
+
     echo "$devices_output"
 }
 

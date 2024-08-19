@@ -1,63 +1,101 @@
 #!/usr/bin/env bash
 
 PROG=$(basename "$0")
-MUTT="$XDG_CONFIG_HOME/mutt"
+SHELL=${SHELL:-$(which zsh)}
+TERMINAL=${TERMINAL:-st}
+MUTT="${XDG_CONFIG_HOME:-$HOME/.config}/mutt"
+declare -a ACCOUNTS
 
-function log_err_and_exit {
-	echo "$PROG: $*"
-	exit 1
+# colors
+BLUE="#5f819d"
+WHITE="#f8f8f2"
+
+# menu
+MENU="dmenu"
+declare -a MENU_ARGS=(-i -l 10)
+
+function usage {
+    echo "usage: $PROG <email>"
 }
 
-function get_acc_file() {
-	local choice="$1"
-	local account_name=$(find "$MUTT/accounts" -name "*$choice*")
-
-	echo "$account_name"
+function logerr_exit {
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
 }
 
-function launch_email_client() {
-	local account_file account_name send_to
-	account_name="$1"
-	send_to="$2"
-	account_file=$(get_acc_file "$account_name")
+function accounts_load {
+    local path files
+    path="$MUTT/accounts"
+    files=$(cd "$path" && find . | tail -n +2 | sed "s/\.\///g; s/\.muttrc$//g")
 
-	setsid "$TERMINAL" -e neomutt "$send_to" -F "$MUTT/muttrc" -F "$account_file"
-	exit 0
+    [[ -z "$files" ]] && logerr_exit "no accounts found in $path"
+
+    IFS=$'\n' readarray -t ACCOUNTS <<<"$files"
 }
 
-function select_acc {
-	local accounts choice
-	accounts="$*"
-	choice=$(echo "$accounts" | dmenu -i -l "$(echo "$accounts" | wc -l)" -p "send from>")
+function accounts_getfile {
+    local choice="$1"
+    local account_name
+    account_name=$(find "$MUTT/accounts" -name "*$choice*")
 
-	echo "$choice"
+    echo "$account_name"
 }
 
-function main() {
-	local send_to choice accounts account_file
+function account_select {
+    local choice
+    MENU_ARGS+=(-p " Sender>")
+    MENU_ARGS+=(-sb "$BLUE" -sf "$WHITE")
+    choice=$(printf "%s\n" "${ACCOUNTS[@]}" | "$MENU" "${MENU_ARGS[@]}")
 
-	accounts=$(cd "$MUTT/accounts" && find . | tail -n +2 | sed "s/\.\///g; s/\.muttrc$//g")
-	send_to="$*"
+    echo "$choice"
+}
 
-	if [[ "${#accounts[@]}" -eq 0 ]]; then
-		log_err_and_exit "no accounts found in $MUTT/accounts"
-	fi
+function run_email_client {
+    local account_file account_name send_to
+    account_name="$1"
+    send_to="$2"
+    account_file=$(accounts_getfile "$account_name")
 
-	if [[ "${#accounts[@]}" -eq 1 ]]; then
-		launch_email_client "${accounts[@]}" "$send_to"
-	fi
+    [[ -z "$account_file" ]] && logerr_exit "account '$account_name' not found"
 
-	choice=$(select_acc "$accounts")
+    setsid -f "$TERMINAL" -e neomutt "$send_to" -F "$MUTT/muttrc" -F "$account_file"
+}
 
-	[[ -z "$choice" ]] && exit
+function dependencies {
+    declare -a deps=(neomutt setsid dmenu)
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            logerr_exit "'$dep' not found"
+        fi
+    done
 
-	account_file=$(get_acc_file "$choice")
+}
 
-	if [[ "$account_file" == "" ]]; then
-		log_err_and_exit "account '$choice' not found"
-	fi
+function main {
+    dependencies
+    local sendto="$1"
+    local account_path=$MUTT/accounts
+    if [[ ! -d "$account_path" ]]; then
+        logerr_exit "no mutt accounts found in $account_path"
+    fi
 
-	launch_email_client "$choice" "$send_to"
+    [[ -z "$sendto" ]] && {
+        usage
+        exit 1
+    }
+
+    accounts_load
+
+    if [[ "${#ACCOUNTS[@]}" -eq 1 ]]; then
+        run_email_client "${ACCOUNTS[@]}" "$sendto"
+        return 0
+    fi
+
+    local account_chose
+    account_chose=$(account_select)
+    [[ -z "$account_chose" ]] && logerr_exit "no account selected"
+
+    run_email_client "$account_chose" "$sendto"
 }
 
 main "$@"

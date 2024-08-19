@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-#       ╻  ┏━┓┏━╸╻┏ ┏━╸┏━┓
-#       ┃  ┃ ┃┃  ┣┻┓┣╸ ┣┳┛
-#       ┗━╸┗━┛┗━╸╹ ╹┗━╸╹┗╸
+# ╻  ┏━┓┏━╸╻┏ ┏━╸┏━┓
+# ┃  ┃ ┃┃  ┣┻┓┣╸ ┣┳┛
+# ┗━╸┗━┛┗━╸╹ ╹┗━╸╹┗╸
 # simple locker with xautolock and zzz
 
 PROG=$(basename "$0")
@@ -59,7 +59,7 @@ function main {
     fi
 
     [[ -n "$timer" ]] && SUSPEND_TIME=$timer
-    setsid "$CMD" -time "$SUSPEND_TIME" -locker "$LOCKER" -detectsleep &
+    setsid -f "$CMD" -time "$SUSPEND_TIME" -locker "$LOCKER" -detectsleep
 }
 
 main "$@"

@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 
+# ╺┳┓╻ ╻┏┓╻┏━┓╺┳╸
+#  ┃┃┃ ┃┃┗┫┗━┓ ┃
+# ╺┻┛┗━┛╹ ╹┗━┛ ╹
+
 # simple script to load dunst themes.
 # requires: dunst, dunstify
 
 set -e
+
+# TODO)):
+# - [ ] add option to create default settings.
 
 PROG=$(basename "$0")
 DEPS=(dunstify dunst)
@@ -20,126 +27,150 @@ HEADER="# DO NOT EDIT! This file will be overwritten by $PROG script.
 # Customization should be done in '$DEFAULTS' instead.
 # See '$PROG --help' for more information."
 
-usage() {
-	cat <<-_EOF
-		Usage: $PROG [options]
+function usage {
+    cat <<-_EOF
+Usage: $PROG [options]
 
-		Options:
-		  -s, --set <name>      Set theme 
-		  -r, --reload          Reload configuration
-		  -l, --list            List available themes
-		  -h, --help            Show this message
+Options:
+    -s, --set <name>      Set theme
+    -r, --reload          Reload configuration
+    -e, --edit            Edit defaults
+    -c, --create          Create defaults settings
+    -l, --list            List available themes
+    -h, --help            Show this message
 
-		Locations:
-		  themes: $THEMES
-		  defaults: $DEFAULTS
-	_EOF
+Locations:
+    themes: $THEMES
+    defaults: $DEFAULTS
+_EOF
 }
 
-log_err() {
-	printf "%s: %s\n" "$PROG" "$*" >&2
-	exit 1
+function log_err {
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
 }
 
-notify() {
-	local msg="$1"
-	export DISPLAY=":0"
-	# dunstify -i "messagebox_info" "$PROG" "$msg"
-	dunstify -i gnome-settings-theme "$PROG" "$msg"
+function logme {
+    printf "%s: %s\n" "$PROG" "$1"
 }
 
-reload() {
-	local retcode mesg
-	mesg="$1"
-
-	pkill dunst >/dev/null
-	retcode="$?"
-
-	if [[ "$retcode" -eq 0 && -n "$mesg" ]]; then
-		notify "$mesg"
-	fi
+function notify {
+    local msg="$1"
+    export DISPLAY=":0"
+    dunstify -i gnome-settings-theme "$PROG" "$msg"
 }
 
-get_theme() {
-	local name base result
-	name="$1"
+function reload {
+    local retcode mesg
+    mesg="$1"
 
-	for theme in "${LIST[@]}"; do
-		base=$(basename "$theme")
-		if [[ "$base" = "$name" ]]; then
-			result="$theme"
-		fi
-	done
+    pkill dunst >/dev/null
+    retcode="$?"
 
-	echo "$result"
+    if [[ "$retcode" -eq 0 && -n "$mesg" ]]; then
+        notify "$mesg"
+    fi
 }
 
-create_theme() {
-	local theme="$1"
-	local name="$2"
-
-	if [[ -f "$DUNSTRC" ]]; then
-		rm "$DUNSTRC"
-	fi
-
-	{
-		echo "$HEADER"
-		cat "$DEFAULTS"
-		cat "$theme"
-	} >>"$DUNSTRC"
-
-	reload "<b>$name</b> loaded"
+function backup_rc {
+    local file="$1"
+    mv "$file" "${file}.bk"
+    log_err "NotImplementedError"
 }
 
-set_theme() {
-	local theme name
-	name="$1"
-	theme=$(get_theme "$name")
+function get_theme {
+    local name base result
+    name="$1"
 
-	if [[ -z "$theme" ]]; then
-		log_err "theme '$1' not found"
-	fi
+    for theme in "${LIST[@]}"; do
+        base=$(basename "$theme")
+        if [[ "$base" = "$name" ]]; then
+            result="$theme"
+        fi
+    done
 
-	create_theme "$theme" "$name"
+    echo "$result"
 }
 
-list_themes() {
-	local theme
-	printf "Usage: %s --set <name>" "$PROG"
-	printf "\n\nThemes:\n"
+function create_theme {
+    local theme="$1"
+    local name="$2"
 
-	for theme in "${LIST[@]}"; do
-		printf "  %b %s\n" "$DOT" "$(basename "$theme")"
-	done
-	exit 0
+    if [[ -f "$DUNSTRC" ]]; then
+        backup_rc "$DUNSTRC"
+    fi
+
+    {
+        echo "$HEADER"
+        cat "$DEFAULTS"
+        cat "$theme"
+    } >>"$DUNSTRC"
+
+    reload "<b>$name</b> loaded"
 }
 
-edit_defaults() {
-  "${EDITOR:-vim}" "$DEFAULTS"
+function set_theme {
+    local theme name
+    name="$1"
+    theme=$(get_theme "$name")
+
+    if [[ -z "$theme" ]]; then
+        log_err "theme '$1' not found"
+    fi
+
+    create_theme "$theme" "$name"
 }
 
-main() {
-	local option theme
-	option="$1"
-	theme="$2"
+function list_themes {
+    local theme
+    printf "Usage: %s --set <name>" "$PROG"
+    printf "\n\nThemes:\n"
 
-	for cmd in "${DEPS[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			log_err "'$cmd' not found"
-		fi
-	done
+    for theme in "${LIST[@]}"; do
+        printf "  %b %s\n" "$DOT" "$(basename "$theme")"
+    done
+    exit 0
+}
 
-	if [[ ! -f "$DEFAULTS" ]]; then
-		log_err "settings file '$DEFAULTS' not found"
-	fi
+function edit_defaults {
+    "${EDITOR:-vim}" "$DEFAULTS"
+}
 
-	case "$option" in
-	-s | *set) set_theme "$2" ;;
-  -e | *edit) edit_defaults ;;
-	-l | *list) list_themes ;;
-	-r | *reload) reload "configuration <b>reloaded</b>" ;;
-	*) usage ;;
-	esac
+function create_defaults {
+    local current_rc
+    # shellcheck disable=2034
+    current_rc=$(cat "$DUNSTRC")
+
+    # echo "$current_rc"
+    log_err "NotImplementedError"
+}
+
+function main {
+    local option="$1"
+    local theme="$2"
+
+    for cmd in "${DEPS[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            log_err "'$cmd' not found"
+        fi
+    done
+
+    # exit if defaults not found
+    if [[ ! -f "$DEFAULTS" ]]; then
+        usage
+        echo
+        logme "use '-c, --create'"
+        log_err "settings file '$DEFAULTS' not found"
+    fi
+
+    case "$option" in
+    -s | *set) set_theme "$2" ;;
+    -e | *edit) edit_defaults ;;
+    -c | *create) create_defaults ;;
+    -l | *list) list_themes ;;
+    -r | *reload) reload "configuration <b>reloaded</b>" ;;
+    *) usage ;;
+    esac
 }
 
 main "$@"

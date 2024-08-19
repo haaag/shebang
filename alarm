@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-PROG=$(basename "$0")
+PROG="${0##*/}"
 ALARM="$HOME/.scripts/assets/alarm-beepbeep.mp3"
 DURATION="$1"
 MESG="${2:-Alarm}"
@@ -22,22 +22,24 @@ function log_err {
     exit 1
 }
 
-function notify {
-    dunstify -r 888 -i "alarm-timer" "$PROG" "$*"
+function send_notification {
+    local icon="alarm-timer"
+    declare -a notify_args=(-r 888 --icon="$icon" "${PROG:-"no-name"}")
+    notify-send "${notify_args[@]}" "$*"
 }
 
 function check_deps {
     for dep in "${DEPS[@]}"; do
         if ! command -v "$dep" >/dev/null; then
             err_msg="'$dep' not found"
-            notify "$err_msg"
+            send_notification "$err_msg"
             log_err "$err_msg"
         fi
     done
 
     if [[ ! -f "$ALARM" ]]; then
         err_msg="alarm file not found: $ALARM"
-        notify "$err_msg"
+        send_notification "$err_msg"
         log_err "$err_msg"
     fi
 
@@ -48,7 +50,7 @@ function pre_exit {
     rm -f "$TIMEFILE"
     rm -f "$PIDFILE"
     rm -f "$MPVPID"
-    notify "alarm with duration $DURATION finished"
+    send_notification "alarm with duration $DURATION finished"
     exit 0
 }
 
@@ -149,7 +151,7 @@ function interpret_time {
 }
 
 function sound_the_alarm {
-    notify "alarm with duration=$duration"
+    send_notification "alarm with duration=$duration"
     mpv "$ALARM" --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
     mpv_pid=$!
     echo "mpv_pid:::$mpv_pid"
@@ -166,7 +168,7 @@ function set_alarm {
     current_time=$((current + duration))
     save_timestamp "$current_time"
 
-    notify "setting alarm for $(show_status)"
+    send_notification "setting alarm for $(show_status)"
 
     while true; do
         current=$(date +%s)

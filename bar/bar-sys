@@ -43,19 +43,12 @@ function get_interface {
 function get_icons {
     icons=(                )
     icons+=(                )
-    icons+=(         )
-    icons+=(          )
-    icons+=(                 )
+    icons+=(          )
+    icons+=(         )
+    icons+=(                  )
     icons+=(               )
     icons+=(              )
-}
-
-function get_pomo {
-    current_timestamp=$(date +%s)
-    pavel=1717476943
-    time_diff_minutes=$(((current_timestamp - pavel) / 60))
-    time_diff_minutes=${time_diff_minutes#-}
-    echo "Time difference: $time_diff_minutes minutes"
+    icons+=(            )
 }
 
 function is_bluetooth_on {
@@ -95,10 +88,10 @@ function is_microphone_on {
 }
 
 function is_cpu_perform {
-    local icon="" # 
+    local icon="" # "  "
     local target="performance"
     governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-    if [[ "$governor" != "$target" ]]; then
+    if [[ "$governor" == "$target" ]]; then
         return
     fi
     echo "$icon"
@@ -172,7 +165,7 @@ function main {
     mapfile -t icons < <(get_interface)
     icons+=("$(is_microphone_on)")
     icons+=("$(is_bluetooth_on)")
-    # icons+=("$(is_cpu_perform)")
+    icons+=("$(is_cpu_perform)")
 
     for prog in "${!programs[@]}"; do
         icon=${programs[$prog]}

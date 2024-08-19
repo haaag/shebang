@@ -46,29 +46,29 @@ function log_err {
     exit 1
 }
 
-function notify {
-    local mesg command
+function send_notification {
+    local mesg="$1"
+    local cmd="dunstify"
     declare -a args
-    mesg="$1"
 
-    if command -v "dunstify" >/dev/null; then
-        command="dunstify"
-        args+=(--hints string:x-dunst-stack-tag:pass)
+    if ! command -v "$cmd" >/dev/null; then
+        cmd="notify-send"
     else
-        command="notify-send"
+        args+=(--hints="string:x-dunst-stack-tag:pass")
     fi
 
-    args+=(--icon dialog-password-symbolic)
-    "$command" "${args[@]}" "$PROG" "$mesg"
+    args+=(--icon="dialog-password-symbolic")
+    args+=(-r 888)
+    "$cmd" "${args[@]}" "$PROG" "$mesg"
 }
 
 function get_password_paths {
-    local prefix password_files
-    prefix=${PASSWORD_STORE_DIR-~/.password-store}
-    password_files=("$prefix"/**/*.gpg)
-    password_files=("${password_files[@]#"$prefix"/}")
-    password_files=("${password_files[@]%.gpg}")
-    printf '%s\n' "${password_files[@]}"
+    local prefix=${PASSWORD_STORE_DIR-~/.password-store}
+    local pwd_files
+    pwd_files=("$prefix"/**/*.gpg)
+    pwd_files=("${pwd_files[@]#"$prefix"/}")
+    pwd_files=("${pwd_files[@]%.gpg}")
+    printf '%s\n' "${pwd_files[@]}"
 }
 
 function get_pass_with_menu {
@@ -113,11 +113,11 @@ function menu {
     retcode=$?
 
     if [[ "$retcode" -ne 0 ]]; then
-        notify "No password found for <b>${pwd}</b>"
+        send_notification "No password found for <b>${pwd}</b>"
         log_err "no password found for '${pwd}'"
     fi
 
-    notify "Copied <b>${pwd}</b> to clipboard.\n\nWill clear in 15 seconds."
+    send_notification "Copied $icon <b>${pwd}</b> to clipboard.\n\nWill clear in 15 seconds."
     exit 0
 }
 
@@ -140,13 +140,13 @@ function otp_code {
     retcode=$?
 
     if [[ "$retcode" -gt 0 ]]; then
-        notify "No OTP found for <b>${pwd}</b>"
+        send_notification "No OTP found for <b>${pwd}</b>"
         log_err "no OTP found for ${pwd}"
     fi
 
-    mesg="Copied OTP code for <b>${pwd}</b> to clipboard.\n\n"
+    mesg="Copied $icon <b>OTP code</b> for <b>${pwd}</b> to clipboard.\n\n"
     mesg+="<i>Will clear in ${PASSWORD_STORE_CLIP_TIME} seconds.</i>"
-    notify "$mesg"
+    send_notification "$mesg"
     exit 0
 }
 
