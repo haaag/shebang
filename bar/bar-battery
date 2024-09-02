@@ -44,6 +44,7 @@ function is_charching {
 function get_charging_bar {
     # Output: [  50%]
     #  
+    # ▓ ▒ ░
     local icon=""
     local charge_level
     charge_level=$((BAT_CHARGE / 10))

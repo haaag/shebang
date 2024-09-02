@@ -129,7 +129,7 @@ function devices_status {
             device_alias=$(get_device_alias "$device")
             battery=$(get_device_battery "$device")
             if [[ -z "$battery" ]]; then
-                battery="-"
+                continue
             fi
 
             check_battery "$device_alias" "$battery"

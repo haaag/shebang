@@ -75,6 +75,7 @@ function send_notification {
 
 function main {
     load_icons
+    [[ -z "$VOL" ]] && VOL="?"
     printf "%s%s  %s%%%s\n" "${SEP1:-}" "$ICON_BAR" "$VOL" "${SEP2:-}"
     send_notification "$ICON_NOTIFY"
 }

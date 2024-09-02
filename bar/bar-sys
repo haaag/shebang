@@ -153,7 +153,7 @@ function main {
     programs["alarm"]=""
     programs["ollama"]="" # "" ""
     programs["bitwarden"]=""
-    programs["tidal-hifi"]=""
+    # programs["tidal-hifi"]=""
     # programs["ytlocal"]=""
     # programs["mpv"]="" # 
     # programs["newsboat"]="" # "" ""
