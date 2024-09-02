@@ -12,25 +12,33 @@ set -o errexit
 set -o pipefail
 
 PROG=$(basename "$0")
-DEPS=(mpv curl perl mpvc mpvqueue)
+DEPS=(mpv curl perl)
 LOGGER="${LOGS_PATH:-$HOME/docs/log}/${PROG}.log"
 XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+PROMPT="  ${PROG}>"
 
-function create_file {
-    local file="$1"
-    touch "$file"
-    sleep 1
-}
-
-function log_err {
+function log_err_and_exit {
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
+}
+
+function send_notification {
+    local prog
+    local mesg="<b>$1</b>"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i youtube "$prog" "$mesg"
+}
+
+function notify_and_exit {
+    local mesg="$1"
+    send_notification "$mesg"
+    log_err_and_exit "$mesg"
 }
 
 function check_dependencies {
     for cmd in "${DEPS[@]}"; do
         if ! command -v "$cmd" >/dev/null; then
-            log_err "dependency '$cmd' not found"
+            notify_and_exit "dependency '$cmd' not found"
         fi
     done
 }
@@ -41,15 +49,6 @@ function log_mesg {
     echo "[$(date '+%F %T')]::[$PROG]::${title}::[URL]::${url}" | tee -a "$LOGGER" >/dev/null
 }
 
-function notification {
-    local mesg="Launching: $1"
-    notify-send "$PROG" "$mesg"
-}
-
-function open_mpv {
-    setsid -f mpv --input-ipc-server="${MPVSOCKET:-/tmp/mpvsocket}" -quiet "$1" >/dev/null 2>&1 &
-}
-
 function usage {
     cat <<-_EOF
 Usage: $PROG <URL>
@@ -57,30 +56,54 @@ _EOF
     exit
 }
 
-function main {
-    local url video_title
-    if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
-        usage
+function get_video_title {
+    local title
+
+    # checks if is a valid URL
+    if ! curl -sL -I "$url" >/dev/null 2>&1; then
+        notify_and_exit "failed to retrieve the URL: '$url'"
     fi
 
+    title=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
+    [[ -z "$title" ]] && title="err: failed to extract video title."
+
+    echo "$title"
+}
+
+function playit {
+    local title="$1"
+    local url="$2"
+    [[ -z "$url" ]] && { notify_and_exit "no <URL> found"; }
+
+    # ${url//youtu.be/yewtu.be}
+
+    log_mesg "$title" "$url"
+    send_notification "$title"
+    setsid -f mpv "$url"
+}
+
+function prompt_and_play {
+    local url title
+    if ! command -v "dmenu" >/dev/null; then
+        notify_and_exit "'dmenu' command not found"
+    fi
+
+    url=$(dmenu -h 22 -p "$PROMPT" </dev/null)
+    [[ -z "$url" ]] && { notify_and_exit "no <URL> found"; }
+
+    title="$(get_video_title)"
+    playit "$title" "$url"
+}
+
+function main {
+    local url="$1"
     check_dependencies
 
-    url="$1"
-    [[ -z "$url" ]] && log_err "no <URL> found"
-
-    if ! curl -sL -I "$url" >/dev/null 2>&1; then
-        log_err "failed to retrieve the URL: '$url'"
-    fi
-
-    video_title=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
-    if [[ -z "$video_title" ]]; then
-        video_title="err: failed to extract video title."
-    fi
-
-    log_mesg "$video_title" "$url"
-    # open_mpv "$url"
-    setsid -f mpvqueue "$url" &
-    notification "$video_title"
+    case "$url" in
+    *youtu.be* | *youtube.com*) playit "$(get_video_title)" "$url" ;;
+    -h | --help) usage ;;
+    *) prompt_and_play ;;
+    esac
 }
 
 main "$@"

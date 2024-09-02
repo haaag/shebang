@@ -21,6 +21,14 @@ for dep in "${DEPS[@]}"; do
     fi
 done
 
+function send_notification {
+    local icon="transmission"
+    local notify_args
+    local mesg="<b>$1</b>"
+    declare -a notify_args=(-r "888" -i "$icon" "${PROG:-"no-name"}")
+    notify-send "${notify_args[@]}" "$mesg"
+}
+
 function add_transmission {
     local magnet="$1"
     local msg="torrent added"
@@ -62,14 +70,23 @@ _EOF
     exit
 }
 
+function stop {
+    pkill -f "$CMD"
+}
+
+function start {
+    setsid -f "$CMD"
+}
+
 function main {
     local subcommand="$1"
     local magnet="${2:-$subcommand}"
 
     case "$subcommand" in
-    -s | start) setsid -f "$CMD" && logme "$CMD started" ;;
-    -k | kill) pkill -f "$CMD" && logme "$CMD stopped" ;;
+    -s | start) start && logme "$CMD started" ;;
+    -k | kill) stop && logme "$CMD stopped" ;;
     -a | add) add_transmission "$magnet" ;;
+    -r | restart) stop && start && send_notification "$CMD restarted" ;;
     -h | help)
         shift
         usage

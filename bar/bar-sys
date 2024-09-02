@@ -45,10 +45,10 @@ function get_icons {
     icons+=(                )
     icons+=(          )
     icons+=(         )
-    icons+=(                  )
+    icons+=(                    )
     icons+=(               )
     icons+=(              )
-    icons+=(            )
+    icons+=(               )
 }
 
 function is_bluetooth_on {
@@ -119,6 +119,12 @@ function is_capslock_on {
     fi
 }
 
+function is_mpd_playing {
+    if mpc status | grep playing >/dev/null; then
+        echo ""
+    fi
+}
+
 function is_redshift_enable {
     local enable=""
     local enable=""
@@ -153,12 +159,14 @@ function main {
     programs["alarm"]=""
     programs["ollama"]="" # "" ""
     programs["bitwarden"]=""
+    programs["jellyfin"]=""
+    programs["galculator"]=""
+    programs["newsboat"]="" # "" # "" ""
     # programs["tidal-hifi"]=""
     # programs["ytlocal"]=""
-    # programs["mpv"]="" # 
-    # programs["newsboat"]="" # "" ""
+    # programs["mpv"]="" #  # 
     # programs["xbps-install"]=""
-    # programs["signal-desktop"]="" # ""
+    programs["signal-desktop"]="" # ""
     # programs["nvim"]=""
     # programs["telegram"]="" # ""
 
@@ -173,13 +181,13 @@ function main {
     done
 
     # maybe implement option to display fallback icon if proc not running
-    # icons+=("$(is_running "xautolock" "" "")")
     icons+=("$(is_running "xautolock" "" "")")
-    icons+=("$(is_running "ytlocal" "" "")")
+    icons+=("$(is_running "ytlocal" "" "")")
 
     icons+=("$(is_notifications_on)")
     icons+=("$(is_redshift_enable)")
     icons+=("$(is_capslock_on)")
+    # icons+=("$(is_mpd_playing)")
 
     printf "%s" "${SEP1:-}"
     for icon in "${icons[@]}"; do

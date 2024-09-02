@@ -64,7 +64,7 @@ function reload {
     local retcode mesg
     mesg="$1"
 
-    pkill dunst >/dev/null
+    pkill -9 dunst >/dev/null
     retcode="$?"
 
     if [[ "$retcode" -eq 0 && -n "$mesg" ]]; then
@@ -96,9 +96,9 @@ function create_theme {
     local theme="$1"
     local name="$2"
 
-    if [[ -f "$DUNSTRC" ]]; then
-        backup_rc "$DUNSTRC"
-    fi
+    # if [[ -f "$DUNSTRC" ]]; then
+    #     backup_rc "$DUNSTRC"
+    # fi
 
     {
         echo "$HEADER"
@@ -127,7 +127,7 @@ function list_themes {
     printf "\n\nThemes:\n"
 
     for theme in "${LIST[@]}"; do
-        printf "  %b %s\n" "$DOT" "$(basename "$theme")"
+        printf " $DOT %s\n" "$(basename "$theme")"
     done
     exit 0
 }
@@ -166,7 +166,7 @@ function main {
     case "$option" in
     -s | *set) set_theme "$2" ;;
     -e | *edit) edit_defaults ;;
-    -c | *create) create_defaults ;;
+    # -c | *create) create_defaults ;;
     -l | *list) list_themes ;;
     -r | *reload) reload "configuration <b>reloaded</b>" ;;
     *) usage ;;

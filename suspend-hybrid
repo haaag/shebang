@@ -2,7 +2,7 @@
 
 PROG="${0##*/}"
 CURRENT_TIME=$(date +%s)
-LOGGER="${LOGS_PATH:-$HOME/docs/log}/suspend-hibernate.log"
+LOGGER="${LOGS_PATH:-$HOME/dcs/log}/suspend-hibernate.log"
 
 # AC offline in minutes
 HIBERNATE_DELAY=45

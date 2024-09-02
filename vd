@@ -19,7 +19,7 @@ sudo -k
 
 PROG=$(basename "$0")
 DEPS=(fzf)
-LOGGER="${LOGS_PATH:-$HOME/docs/log/}/void.log"
+LOGGER="${LOGS_PATH:-$HOME/dcs/log/}/void.log"
 BULLET="\u2022"
 
 # Icons

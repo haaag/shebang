@@ -8,7 +8,7 @@
 
 PROG="${0##*/}"
 declare -a DEPS=(mpv pybrowsers tuiropen xclip ytmpv)
-declare -a OPTS=(browsers copy mpv ytmpv img)
+declare -a OPTS=(browsers open copy mpv ytmpv img)
 
 function log_err {
     local msg="$1"
@@ -40,6 +40,7 @@ function choose_action {
     [[ -z $CHOSEN ]] && exit
 
     case "$CHOSEN" in
+    open) setsid -f xdg-open "$arg" ;;
     browsers) setsid -f pybrowsers --verbose --url "$arg" ;;
     copy) echo -e "$arg" | xclip -selection clipboard -r ;;
     mpv) mympv "$arg" & ;;

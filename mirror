@@ -14,200 +14,202 @@ set -e
 [[ -f "$HOME/.config/shell/colors.sh" ]] && . "$HOME/.config/shell/colors.sh"
 
 PROG=$(basename "$0")
-LOGGER="$LOG_PATH/$(date '+%F_%H_%M')-mirror.log"
+LOGGER="${LOGS_PATH:-$HOME/docs/log}/$(date '+%F_%H_%M')-mirror.log"
 DEPS=(rsync tput ping)
 DRYRUN=1
 
 declare -a EXCLUDE
-declare -a DIRS=("__pycache__" ".venv" "venv" ".env" ".VENV" "VENV"
-	".mypy_cache" ".cache" ".ruff_cache" ".ropeproject" "node_modules")
+declare -a DIRS=(
+    "__pycache__" ".venv" ".VENV" "venv" "VENV" ".env" ".ENV"
+    ".mypy_cache" ".cache" ".ruff_cache" ".ropeproject" "node_modules"
+)
 
 for ex in "${DIRS[@]}"; do
-	EXCLUDE+=(--exclude="$ex")
+    EXCLUDE+=(--exclude="$ex")
 done
 
 # TODO)): replace flags with flags-array, Delegate adding flags to functions block.
 declare -a FLAGS+=(--archive --update --verbose --human-readable --perms) # -auvhp
 
 function log_err() {
-	local msg="$1"
-	printf "%s: %s\n" "$PROG" "$msg" >&2
-	exit 1
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
 }
 
 for dep in "${DEPS[@]}"; do
-	if ! command -v "$dep" >/dev/null; then
-		log_err "err '$dep' not found"
-	fi
+    if ! command -v "$dep" >/dev/null; then
+        log_err "err '$dep' not found"
+    fi
 done
 
 function logme() {
-	local time=$(date '+%F::%T')
-	echo "[${time}]::$*" | tee -a "$LOGGER"
+    local time=$(date '+%F::%T')
+    echo "[${time}]::$*" | tee -a "$LOGGER"
 }
 
 function printcolor() {
-	local msg="$1"
-	local color="$2"
-	printf "\n%b%s%b\n" "$color" "$msg" "$RESET"
+    local msg="$1"
+    local color="$2"
+    printf "\n%b%s%b\n" "$color" "$msg" "$RESET"
 }
 
 function is_online() {
-	echo -en "\nChecking ${BLUE}remote-host${RESET} is online: "
-	if ! ping -c 1 "$REMOTE_HOST" >/dev/null; then
-		echo -e "${RED}unreachable${RESET}"
-		log_err "host $REMOTE_HOST unreachable"
-	fi
+    echo -en "\nChecking ${BLUE}remote-host${RESET} is online: "
+    if ! ping -c 1 "$REMOTE_HOST" >/dev/null; then
+        echo -e "${RED}unreachable${RESET}"
+        log_err "host $REMOTE_HOST unreachable"
+    fi
 
-	echo -e "${GREEN}reachable${RESET}"
-	return 0
+    echo -e "${GREEN}reachable${RESET}"
+    return 0
 }
 
 function notify() {
-	local msg="$1"
-	local priority="${2:-normal}"
-	notify-send -i emblem-synchronizing --urgency="$priority" --app-name="$PROG" "$PROG" "$msg"
+    local msg="$1"
+    local priority="${2:-normal}"
+    notify-send -i emblem-synchronizing --urgency="$priority" --app-name="$PROG" "$PROG" "$msg"
 }
 
 function line() {
-	w="$(tput cols)"
-	char="="
-	printf "%${w}s\n" | sed "s/ /$char/g"
-	printf "\n"
+    w="$(tput cols)"
+    char="="
+    printf "%${w}s\n" | sed "s/ /$char/g"
+    printf "\n"
 }
 
 function mdate() {
-	local lavender="\e[30;44m"
-	local white="\e[30;47m"
+    local lavender="\e[30;44m"
+    local white="\e[30;47m"
 
-	printf "\n"
-	echo -e "$lavender ""$(date +%H:%M) $RESET $white ""$(date "+%A, %d %B %Y") $RESET $white $HOSTNAME $RESET "
-	printf "\n"
+    printf "\n"
+    echo -e "$lavender ""$(date +%H:%M) $RESET $white ""$(date "+%A, %d %B %Y") $RESET $white $HOSTNAME $RESET "
+    printf "\n"
 }
 
 function new_mdate() {
-	echo -en "${BLUE_BG} $(date +%H:%M) ${RESET} "
-	echo -en "${WHITE_BG} $(date "+%A, %d %B %Y") ${RESET} "
-	echo -e "${WHITE_BG} ${HOSTNAME} ${RESET}"
+    echo -en "${BLUE_BG} $(date +%H:%M) ${RESET} "
+    echo -en "${WHITE_BG} $(date "+%A, %d %B %Y") ${RESET} "
+    echo -e "${WHITE_BG} ${HOSTNAME} ${RESET}"
 }
 
 function sync_to_remote() {
-	local src="$1"
-	local dest="$2"
-	local mesg="$3"
+    local src="$1"
+    local dest="$2"
+    local mesg="$3"
 
-	echo -e "\n${YELLOW_BG}${src}${RESET} -> ${BLUE_BG}${dest}${RESET}"
-	is_online
-	if rsync "${FLAGS[@]}" "${EXCLUDE[@]}" "$src" "$dest"; then
-		printcolor "Done..." "$GREEN_BG"
-		notify "$mesg"
-	else
-		err_msg="err on rsync: $src -> $dest"
-		notify "$err_msg"
-		log_err "$err_msg"
-	fi
+    echo -e "\n${YELLOW_BG}${src}${RESET} -> ${BLUE_BG}${dest}${RESET}"
+    is_online
+    if rsync "${FLAGS[@]}" "${EXCLUDE[@]}" "$src" "$dest"; then
+        printcolor "Done..." "$GREEN_BG"
+        notify "$mesg"
+    else
+        err_msg="err on rsync: $src -> $dest"
+        notify "$err_msg"
+        log_err "$err_msg"
+    fi
 }
 
 function dotfiles() {
-	local src="${HOME}/.dotfiles"
-	# local dest="${DESTINATION}/dotfiles"
-	local dest="/tmp/001/miii/dest/dotfiles"
-	FLAGS+=(--delete)
-	sync_to_remote "$src" "$dest" "Syncing script...${FUNCNAME[0]} backup done."
+    local src="${HOME}/.dotfiles"
+    # local dest="${DESTINATION}/dotfiles"
+    local dest="/tmp/001/miii/dest/dotfiles"
+    FLAGS+=(--delete)
+    sync_to_remote "$src" "$dest" "Syncing script...${FUNCNAME[0]} backup done."
 }
 
 function suckless() {
-	local src="/suckless"
-	local dest="${DESTINATION}${src}"
-	REMOTE_SUCKLESS="/suckless"
-	echo -e "$YELLOW "Syncing suckless..." $RESET \n "
-	rsync -arvh --delete "$src" "$dest"
-	printf "\n"
-	echo -e "$YELLOW Done. $RESET\n"
-	notify "Syncing script...${FUNCNAME[0]} backup done."
+    local src="/suckless"
+    local dest="${DESTINATION}${src}"
+    REMOTE_SUCKLESS="/suckless"
+    echo -e "$YELLOW "Syncing suckless..." $RESET \n "
+    rsync -arvh --delete "$src" "$dest"
+    printf "\n"
+    echo -e "$YELLOW Done. $RESET\n"
+    notify "Syncing script...${FUNCNAME[0]} backup done."
 }
 
 function mail() {
-	# TODO: Update server info
-	echo -e "$MAGENTA "Syncing mails..." $RESET \n "
-	rsync -arvh --delete "${HOME}"/.local/share/mail \
-		hs@bigarch:"${HOME}"/backup/rsync/mail
-	printf "\n"
-	echo -e "$CYAN "Syncing configurations files..." $RESET \n "
-	rsync -arvh --delete /usr/local/share/mutt-wizard/ \
-		hs@bigarch:"${HOME}"/backup/rsync/mail/config
-	printf "\n"
-	echo -e "$MAGENTA Done. $RESET\n"
-	notify "Syncing script...${FUNCNAME[0]} backup done"
+    # TODO: Update server info
+    echo -e "$MAGENTA "Syncing mails..." $RESET \n "
+    rsync -arvh --delete "${HOME}"/.local/share/mail \
+        hs@bigarch:"${HOME}"/backup/rsync/mail
+    printf "\n"
+    echo -e "$CYAN "Syncing configurations files..." $RESET \n "
+    rsync -arvh --delete /usr/local/share/mutt-wizard/ \
+        hs@bigarch:"${HOME}"/backup/rsync/mail/config
+    printf "\n"
+    echo -e "$MAGENTA Done. $RESET\n"
+    notify "Syncing script...${FUNCNAME[0]} backup done"
 }
 
 function system() {
-	local msg=""
-	local src="/"
-	local dest="${DESTINATION}/$(hostname)-backup"
-	declare -a exclude folders
+    local msg=""
+    local src="/"
+    local dest="${DESTINATION}/$(hostname)-backup"
+    declare -a exclude folders
 
-	printcolor "Starting <$(hostname)-system> backup..." "$YELLOW_BG"
+    printcolor "Starting <$(hostname)-system> backup..." "$YELLOW_BG"
 
-	FLAGS+=(--delete)
-	if [[ "$DRYRUN" -eq 0 ]]; then
-		FLAGS+=(--dry-run)
-		printcolor "In dry-run mode" "$RED_BG"
-	fi
+    FLAGS+=(--delete)
+    if [[ "$DRYRUN" -eq 0 ]]; then
+        FLAGS+=(--dry-run)
+        printcolor "In dry-run mode" "$RED_BG"
+    fi
 
-	folders=("/proc/" "/sys/" "/tmp/" "/run/" "/mnt/" "/media/" "lost+found" "/home/")
-	for dir in "${folders[@]}"; do
-		exclude+=(--exclude "$dir")
-	done
+    folders=("/proc/" "/sys/" "/tmp/" "/run/" "/mnt/" "/media/" "lost+found" "/home/")
+    for dir in "${folders[@]}"; do
+        exclude+=(--exclude "$dir")
+    done
 
-	sudo rsync "${FLAGS[@]}" "${exclude[@]}" "${src}" "${dest}"
-	retcode=$?
+    sudo rsync "${FLAGS[@]}" "${exclude[@]}" "${src}" "${dest}"
+    retcode=$?
 
-	if [[ "$retcode" -eq 0 ]]; then
-		printcolor "Done..." "$GREEN_BG"
-		msg="System Backup ${FUNCNAME[0]} sync done" "critical"
-	else
-		printcolor "Error..." "$RED_BG"
-		msg="🚩❗ System Backup ${FUNCNAME[0]} exited with error" "critical"
-	fi
+    if [[ "$retcode" -eq 0 ]]; then
+        printcolor "Done..." "$GREEN_BG"
+        msg="System Backup ${FUNCNAME[0]} sync done" "critical"
+    else
+        printcolor "Error..." "$RED_BG"
+        msg="🚩❗ System Backup ${FUNCNAME[0]} exited with error" "critical"
+    fi
 
-	notify "$msg"
+    notify "$msg"
 }
 
 function scripts() {
-	local src="${HOME}/.scripts/"
-	local dest="${DESTINATION}/scripts/"
-	local dest="/tmp/001/miii/dest/scripts/"
-	FLAGS+=(--delete)
-	printcolor "Starting <scripts> backup..." "${YELLOW_BG}"
-	sync_to_remote "${src}" "${dest}" "Syncing script...${FUNCNAME[0]} backup done."
+    local src="${HOME}/bin/"
+    local dest="${DESTINATION}/bin/"
+    local dest="/tmp/001/miii/dest/scripts/"
+    FLAGS+=(--delete)
+    printcolor "Starting <scripts> backup..." "${YELLOW_BG}"
+    sync_to_remote "${src}" "${dest}" "Syncing script...${FUNCNAME[0]} backup done."
 }
 
 function code() {
-	local src="${HOME}/dev/"
-	# local dest="${DESTINATION}/dev"
-	local dest="/tmp/001/miii/dest/dev"
-	FLAGS+=(--max-size=1G --delete --ignore-existing)
-	printcolor "Starting <projects> backup..." "${CYAN_BG}"
-	sync_to_remote "${src}" "${dest}" "Syncing script...${FUNCNAME[0]} backup done."
+    local src="${HOME}/dev/"
+    # local dest="${DESTINATION}/dev"
+    local dest="/tmp/001/miii/dest/dev"
+    FLAGS+=(--max-size=1G --delete --ignore-existing)
+    printcolor "Starting <projects> backup..." "${CYAN_BG}"
+    sync_to_remote "${src}" "${dest}" "Syncing script...${FUNCNAME[0]} backup done."
 }
 
 function apps() {
-	local src="${HOME}/apps/"
-	local dest="${DESTINATION}/apps"
-	EXCLUDE+=(--exclude="neovim/")
-	FLAGS+=(--delete)
-	printcolor "Starting <apps> backup..." "$CYAN"
-	rsync "${FLAGS[@]}" "${EXCLUDE[@]}" "$src" "$dest" && printcolor "Done..." "$GREEN_BG"
-	notify "Syncing script...${FUNCNAME[0]} folder backup done."
+    local src="${HOME}/apps/"
+    local dest="${DESTINATION}/apps"
+    EXCLUDE+=(--exclude="neovim/")
+    FLAGS+=(--delete)
+    printcolor "Starting <apps> backup..." "$CYAN"
+    rsync "${FLAGS[@]}" "${EXCLUDE[@]}" "$src" "$dest" && printcolor "Done..." "$GREEN_BG"
+    notify "Syncing script...${FUNCNAME[0]} folder backup done."
 }
 
 function menu() {
-	# FIX:
-	while true; do
-		clear
-		mdate
-		echo -e "
+    # FIX:
+    while true; do
+        clear
+        mdate
+        echo -e "
       ${WHITE}1$RESET dotfiles
       ${WHITE}2$RESET scripts
       ${WHITE}3$RESET system_dry_run
@@ -216,27 +218,27 @@ function menu() {
       ${WHITE}6$RESET dev
       ${WHITE}7$RESET apps
       ${WHITE}0$RESET exit\n"
-		printf "\n"
-		echo -en "${WHITE}enter choice:$RESET "
-		read -r CHOSEN
-		case "$CHOSEN" in
-		1) dotfiles ;;
-		2) scripts ;;
-		3) system_dry_run ;;
-		4) system ;;
-		5) mail ;;
-		6) code ;;
-		7) apps ;;
-		8 | q | 0) echo -e "exiting..." && exit 1 ;;
-		*) echo -en "${WHITE}enter choice:${RESET} " ;;
-		esac
-		echo -e "${GREEN}enter return to continue${RESET} \c"
-		read -r _
-	done
+        printf "\n"
+        echo -en "${WHITE}enter choice:$RESET "
+        read -r CHOSEN
+        case "$CHOSEN" in
+        1) dotfiles ;;
+        2) scripts ;;
+        3) system_dry_run ;;
+        4) system ;;
+        5) mail ;;
+        6) code ;;
+        7) apps ;;
+        8 | q | 0) echo -e "exiting..." && exit 1 ;;
+        *) echo -en "${WHITE}enter choice:${RESET} " ;;
+        esac
+        echo -e "${GREEN}enter return to continue${RESET} \c"
+        read -r _
+    done
 }
 
 function usage() {
-	cat <<-_EOF
+    cat <<-_EOF
 		usage: $PROG [Options]
 
 		Script for syncing/backing up my files, projects, scripts, system and mail.
@@ -253,27 +255,27 @@ function usage() {
 		  -S, --system            Backup system
 		  -h, --help              Show this help and exit
 	_EOF
-	exit
+    exit
 }
 
 function main() {
 
-	[[ ! -f "$HOME/.config/mirror/server.sh" ]] && log_err "server info not found"
+    [[ ! -f "$HOME/.config/mirror/server.sh" ]] && log_err "server info not found"
 
-	case "$1" in
-	-d | --dotfiles) dotfiles ;;
-	-s | --scripts) scripts ;;
-	-M | --mail) mail ;;
-	-c | --code) code ;;
-	-a | --apps) apps ;;
-	-o | --options) menu ;;
-	-D | --dry-run) DRYRUN=0 new_system ;;
-	-S | --system) system ;;
-	--phone) vimwiki_android ;;
-	--suckless) suckless ;;
-	-h | --help | help) usage ;;
-	*) usage ;;
-	esac
+    case "$1" in
+    -d | --dotfiles) dotfiles ;;
+    -s | --scripts) scripts ;;
+    -M | --mail) mail ;;
+    -c | --code) code ;;
+    -a | --apps) apps ;;
+    -o | --options) menu ;;
+    -D | --dry-run) DRYRUN=0 new_system ;;
+    -S | --system) system ;;
+    --phone) vimwiki_android ;;
+    --suckless) suckless ;;
+    -h | --help | help) usage ;;
+    *) usage ;;
+    esac
 }
 
 main "$@"

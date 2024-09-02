@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 PROG="${0##*/}"
-ALARM="$HOME/.scripts/assets/alarm-beepbeep.mp3"
+ALARM="$HOME/bin/assets/alarm-beepbeep.mp3"
 DURATION="$1"
 MESG="${2:-Alarm}"
 ICON=""
@@ -55,7 +55,7 @@ function pre_exit {
 }
 
 function usage {
-    printf "Usage: %s <duration> [<name>]\n" "$PROG"
+    echo "Usage: $PROG <duration> [<name>]"
 }
 
 function cancel_timer {
@@ -178,6 +178,7 @@ function set_alarm {
         if [[ $time_diff -le 0 ]]; then
             break
         fi
+        sleep 1s
     done
 
     sound_the_alarm

@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+
+#
+# ╻ ╻┏━╸╻ ╻
+# ┃ ┃┣╸ ┃╻┃
+# ┗━┛╹  ┗┻┛
+#
+# Simple UFW Rules
+
+set -e
+
+PROG=${0##*/}
+NET="192.168.1.0/24"
+NET_ADDR=("$NET")
+NOCONFIRM=0
+
+declare -a RULES
+
+# Colors
+RED=$(tput setaf 1)
+GRAY=$(tput setaf 8)
+GREEN=$(tput setaf 2)
+YELLOW=$(tput setaf 3)
+BLUE=$(tput setaf 4)
+WHITE=$(tput setaf 7)
+MAGENTA=$(tput setaf 5)
+CYAN=$(tput setaf 6)
+# Style
+DIM=$(tput dim)
+BOLD=$(tput bold)
+RESET="$(tput sgr0)"
+
+# indent
+DOT="${RED}${BOLD}+${RESET}"
+
+function show_info {
+    echo -e "${MAGENTA}$(date +%H:%M)${RESET} ${WHITE}$(date "+%A, %d %B %Y")${RESET} ${WHITE}$(hostname)${RESET}\n"
+    echo -ne "${MAGENTA} UFW Rules $RESET" "${CYAN} Network ${NET_ADDR[*]} $RESET\n\n"
+}
+
+function confirm {
+    local question="$1"
+    local answer
+
+    if [[ "$NOCONFIRM" -eq 1 ]]; then
+        return 0
+    fi
+
+    echo -en "$question ${GRAY}[Y/n]:${RESET} "
+    read -r answer
+
+    case "$answer" in
+    y | Y) return 0 ;;
+    n | N) return 1 ;;
+    *) return 0 ;;
+    esac
+}
+
+function confirm_edit {
+    local question="$1"
+    local answer
+    echo -n "$question ${GRAY}[yes/edit/No]:${RESET} "
+    read -r answer
+
+    case "$answer" in
+    y | Y | yes) return 0 ;;
+    n | N | No) return 1 ;;
+    e | E | edit) echo && edit_rules ;;
+    *) return 0 ;;
+    esac
+}
+
+function show_rule {
+    local rule="$1"
+    printf "%b%s%b%s" "$DIM" "Rule> " "$RESET" "$rule"
+}
+
+function header {
+    local service
+    service=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+    printf "%b+ %b%s%b\n" "$BOLD" "$CYAN" "$service" "$RESET"
+}
+
+function colored_rule {
+    local proto="${BOLD}${GREEN}$1${RESET}"
+    local port="${BOLD}${MAGENTA}$2${RESET}"
+    local comment="${BOLD}${CYAN}$3${RESET}"
+    local net="${YELLOW}${BOLD}$NET${RESET}"
+    local allow="${BOLD}${GREEN}allow${RESET}"
+    echo "ufw $allow in proto $proto from $net to any port $port comment $comment"
+}
+
+function allow_app {
+    local app="$1"
+
+    if confirm "${YELLOW}+${RESET} Allow App?"; then
+        RULES+=("ufw allow $app")
+    else
+        printf "%b%b%s%b\n\n" "$BOLD" "$YELLOW" "Skipping adding rule" "$RESET"
+    fi
+}
+
+function allow_rule {
+    local proto="$1"
+    local port="$2"
+    local comment="$3"
+
+    if confirm "$(colored_rule "$proto" "$port" "$comment")"; then
+        RULES+=("ufw allow in proto $proto from $NET to any port $port comment $comment")
+    else
+        printf "%b%b%s%b\n\n" "$BOLD" "$BLUE" "Skipping adding rule" "$RESET"
+    fi
+}
+
+function rules_init {
+    header "initial rules"
+
+    if confirm "$(show_rule "ufw default ${BOLD}${RED}deny${RESET} incoming")"; then
+        RULES+=("ufw default deny incoming")
+    else
+        printf "%b%b%s%b\n\n" "$BOLD" "$YELLOW" "Skipping adding rule" "$RESET"
+    fi
+
+    if confirm "$(show_rule "ufw default ${BOLD}${GREEN}allow${RESET} outgoing")"; then
+        RULES+=("ufw default allow outgoing")
+    else
+        printf "%b%b%s%b\n\n" "$BOLD" "$YELLOW" "Skipping adding rule" "$RESET"
+    fi
+    echo
+}
+
+function rules_mpd {
+    local service="mpd"
+    header "$service"
+    allow_rule "tcp" "6600" "mpd"
+}
+
+function rules_localsend {
+    local service="localsend"
+    header "$service"
+    allow_rule "tcp" "53317" "localsend"
+}
+
+function rules_transmission {
+    local service="transmission"
+    header "$service"
+    allow_app "$service"
+}
+
+function rules_jellyfin {
+    local service="Jellyfin"
+    header "$service"
+
+    allow_rule "tcp" "8097" "jellyfin"
+    allow_rule "tcp" "8921" "jellyfin"
+    allow_rule "udp" "1900" "jellyfin/udp"
+    allow_rule "udp" "7360" "jellyfin/udp"
+}
+
+function rules_detail {
+    echo
+    header "Rules to apply"
+    for i in "${RULES[@]}"; do
+        echo " $DOT $i"
+    done
+    echo
+}
+
+function rules_all {
+    rules_init
+    rules_transmission
+    rules_mpd
+    rules_jellyfin
+    rules_localsend
+}
+
+function rules_apply {
+    sudo -k -p "[sudo] Apply rules:  "
+    for i in "${RULES[@]}"; do
+        echo -n "$i: ${BLUE}"
+        eval "sudo $i"
+        echo -n "$RESET"
+    done
+}
+
+function rules_display {
+    header "Select a rule to delete"
+    for i in "${!RULES[@]}"; do
+        echo "$((i + 1))) ${RULES[i]}"
+    done
+    echo "q) quit"
+}
+
+function edit_rules {
+    while true; do
+        local n="${#RULES[@]}"
+        if [[ "$n" -le 0 ]]; then
+            echo "no rules"
+            exit 1
+        fi
+
+        rules_display
+        echo
+        read -r -p "$DOT ${BOLD}Select${RESET}: " selection
+        echo
+
+        # Check if the user wants to exit
+        if [[ "$selection" =~ ^-*q(uit)?$ ]]; then
+            break
+        fi
+
+        # Check if the input is a number and within the range of the array
+        if [[ $selection =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le ${#RULES[@]} ]; then
+            # Delete the selected rule from the array
+            unset 'RULES[$((selection - 1))]'
+            # Re-index the array
+            RULES=("${RULES[@]}")
+        else
+            echo "Invalid selection."
+        fi
+    done
+}
+
+function usage {
+    echo "Usage: $PROG <OPTIONS>
+
+Options:
+    all             Set all rules
+    mpd             Set MPD's rules
+    jellyfin        Set Jellyfin's rules
+    transmission    Set Transmission's rules
+    syncthing       Set Syncthing's rules
+    localsend       Set LocalSend's rules
+    --nc            Will add rules without confirm"
+}
+
+function main {
+    local opt="$1"
+    local confirm="$2"
+
+    if [[ "${opt-}" =~ ^-*h(elp)?$ ]]; then # || [[ "$#" -ne 1 ]]; then
+        usage && exit
+    fi
+
+    # not secure :D
+    if [[ -n "$confirm" ]]; then
+        NOCONFIRM=1
+    fi
+
+    show_info
+
+    case "$opt" in
+    all) rules_all ;;
+    mpd) rules_mpd ;;
+    jellyfin) rules_jellyfin ;;
+    transmission) rules_transmission ;;
+    localsend) rules_localsend ;;
+    *) usage && exit ;;
+    esac
+
+    rules_detail
+
+    if confirm_edit "${BOLD}${DOT} Apply Rules?${RESET}"; then
+        rules_apply
+    else
+        exit 1
+    fi
+
+    printf "%b%s%b\n" "$BOLD" "Remember to restart UFW service" "$RESET"
+}
+
+main "$@"

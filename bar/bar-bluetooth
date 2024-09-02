@@ -65,7 +65,7 @@ function is_device_connected {
 function get_device_battery {
     local device battery
     device="$1"
-    battery=$(bluetoothctl info "$device" | grep "Battery" | awk '{print $4}' | tr -d '()')
+    battery=$(bluetoothctl info "$device" | grep "Battery Percentage:" | awk '{print $4}' | tr -d '()')
     echo "$battery"
 }
 

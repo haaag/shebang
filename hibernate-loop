@@ -8,7 +8,7 @@
 # files to determine whether to trigger hibernation or perform other actions.
 
 PROG="${0##*/}"
-LOGGER="${LOGS_PATH:-$HOME/docs/log}/suspend-hibernate.log"
+LOGGER="${LOGS_PATH:-$HOME/dcs/log}/suspend-hibernate.log"
 DEPS=(zzz ZZZ tee)
 
 # lock files

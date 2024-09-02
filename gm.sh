@@ -5,7 +5,7 @@ CMD=gm
 DEPS=("$CMD" dunstify xclip fzf)
 declare -a CMD_ARGS=(--list --oneline --color=always)
 declare -a FZF_ARGS=(--ansi --no-preview --tac --layout=default --cycle)
-FZF_ARGS+=(--prompt='  Gomarks> ')
+FZF_ARGS+=(--prompt='  Gomarks> ' --print-query --multi)
 
 # result data
 URL=""
@@ -24,9 +24,11 @@ function delay {
     read -p "Press ENTER to continue..." -r _
 }
 
-function copy_to_clipboard {
-    local content="$1"
-    $SHELL -c "echo -n '$content' | nohup xclip -selection clipboard >/dev/null 2>&1"
+function ddg {
+    local query="$1"
+    local url="https://duckduckgo.com/?q=${query// /%20}&t=ffab&atb=v1-1"
+    setsid -f xdg-open "$url"
+    exit 0
 }
 
 function get_bookmark {
@@ -34,8 +36,12 @@ function get_bookmark {
     bookmark=$("$CMD" "${CMD_ARGS[@]}" | fzf "${FZF_ARGS[@]}")
     retcode="$?"
 
-    if [[ "$retcode" -ne 0 ]]; then
+    if [[ "$retcode" -ne 0 ]] && [[ -z "$bookmark" ]]; then
         exit "$retcode"
+    fi
+
+    if [[ "$retcode" -ne 0 ]]; then
+        ddg "$bookmark"
     fi
 
     id=$(echo "$bookmark" | awk '{print $1}')
@@ -51,7 +57,6 @@ function main {
     done
 
     get_bookmark
-
     setsid -f xdg-open "$URL"
     dunstify -r 696 -i "do-not-exists" "⭐ Gomarks" "$TITLE"
 }

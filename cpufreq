@@ -18,13 +18,13 @@ set -o pipefail
 PROG=$(basename "$0")
 AVAILABLE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
 GOVERNOR=(/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor)
-DEPS=(tlp-stat)
 
 # notification
+DISPLAY=${DISPLAY:-:0}
 NOTI_ICON="power-profile-performance-symbolic"
 
 # always ask password
-sudo -k
+sudo --askpass --reset-timestamp
 
 # colors
 RED=$(tput setaf 1)
@@ -66,7 +66,7 @@ function log_err {
     exit 1
 }
 
-function notify {
+function send_notification {
     # check if calling from x11
     if [[ -z "$DISPLAY" ]]; then
         return
@@ -132,7 +132,7 @@ function mode_set {
 
     logme "setting to '$mode' mode" "$BLUE"
     echo "$mode" | sudo tee "${GOVERNOR[@]}" >/dev/null
-    notify "🔴 setting to <b>$mode</b> mode" "$NOTI_ICON"
+    send_notification "🔴 setting to <b>$mode</b> mode" "$NOTI_ICON"
 }
 
 function show_stats {
@@ -184,11 +184,11 @@ function show_menu {
 function main {
     local arg="$1"
 
-    for dep in "${DEPS[@]}"; do
-        if ! command -v "$dep" >/dev/null; then
-            log_err "$dep not found"
-        fi
-    done
+    # for dep in "${DEPS[@]}"; do
+    #     if ! command -v "$dep" >/dev/null; then
+    #         log_err "$dep not found"
+    #     fi
+    # done
 
     case "$arg" in
     -s | *set) shift && mode_set "$@" ;;

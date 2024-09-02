@@ -61,7 +61,7 @@ function log_err {
     exit 1
 }
 
-function log_err_and_exit {
+function err_and_exit {
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
 }
@@ -84,7 +84,6 @@ function dependencies {
         if ! command -v "$cmd" >/dev/null; then
             err_msg="'$cmd' command not found."
             notification "$PROG script" "$err_msg"
-            title "$err_msg"
             exit 1
         fi
     done
@@ -99,13 +98,6 @@ function center_text_with_tput {
     local msg="$1"
     columns=$(tput cols)
     printf "%*s\n" $(((${#msg} + columns) / 2)) "$msg"
-}
-
-function notification {
-    local title mesg
-    title="$1"
-    mesg="$2"
-    notify-send "$title" "$mesg"
 }
 
 function beepme {
@@ -128,17 +120,18 @@ function delay_exit {
     fi
 }
 
+function notification {
+    local title mesg
+    title="$1"
+    mesg="$2"
+    notify-send "$title" "$mesg"
+}
+
 function send_notification {
-    local notify_cmd="dunstify"
-    local icon="alarm-timer"
-    declare -a notify_args=(--replace="888" --icon="$icon" "${PROG:-"no-name"}")
-
-    if ! command -v "$notify_cmd" >/dev/null; then
-        notify_cmd="notify-send"
-        unset "notify_args[0]"
-    fi
-
-    "$notify_cmd" "${notify_args[@]}" "$*"
+    local prog
+    local mesg="<b>$1</b>"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i grsync "$prog" "$mesg"
 }
 
 function confirm {

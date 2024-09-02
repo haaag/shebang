@@ -3,117 +3,151 @@
 set -e
 set -o pipefail
 
-[[ -v debug ]] && set -x
-
 PROGRAM=$(basename "$0")
-DOTFILES="$HOME/.dotfiles"
-PROGRAMS=(pipewire dunst sxhkd picom autorandr greenclip pymarks)
 
 # Colors
 red="\e[91m"
-cyan="\e[36m"
 magenta="\e[35m"
 nc="\e[0m"
 
+DOTFILES="$HOME/.dotfiles"
+# CONFIGS=(fontconfig greenclip.toml)
+PROGRAMS=(
+    autorandr
+    bat
+    dunst
+    fd
+    git
+    greenclip
+    lazygit
+    nnn
+    nvim
+    picom
+    pipewire
+    pymarks
+    rofi
+    sxhkd
+    sxiv
+    tmux
+    zathura
+    xss-lock
+)
+
 err() {
-	printf "${red}Error:${nc} %s\n" "$*"
+    printf "${red}Error:${nc} %s\n" "$*"
 }
 
 program_exists() {
-	local program
-	program="$1"
+    local program="$1"
 
-	if command -v "$program" >/dev/null; then
-		return 0
-	else
-		return 1
-	fi
+    if command -v "$program" >/dev/null; then
+        return 0
+    else
+        err "'$program' not found"
+        return 1
+    fi
 }
 
 dir_exists() {
-	local folder
-	folder="$DOTFILES/$program"
+    local folder="$DOTFILES/$program"
 
-	if [ -d "$folder" ]; then
-		return 0
-	else
-		err "'$folder' not found"
-		return 1
-	fi
-
+    if [ -d "$folder" ]; then
+        return 0
+    else
+        err "'$folder' not found"
+        return 1
+    fi
 }
 
-restore() {
-	local program
-	program="$1"
+confirmation() {
+    local default_value="Y"
+    local program="$1"
+    local input
 
-	if program_exists "$program" && dir_exists "$program"; then
-		folder="$DOTFILES/$program"
-		echo -e "Restoring ${cyan}$program${nc}..."
-		echo -e "$folder ${magenta}restored${nc}"
-		read -p "Press ENTER to continue..." -r _
-		cd "$DOTFILES"
-		stow -v "$program"
-		echo -e "$folder ${magenta}restored${nc}"
-		echo ""
-	fi
+    echo -ne "Restore ${red}$program${nc}? [Y/n] "
+    read -p "" -r choice
+    input=${choice:-$default_value}
+
+    case "$input" in
+    y | Y) return 0 ;;
+    n | N) return 1 ;;
+    *) return 1 ;;
+    esac
 }
 
-dependencies() {
-	local programs
-	programs="fzf stow"
-	for program in $programs; do
-		if ! program_exists "$program"; then
-			err "'$program' not found"
-			exit 1
-		fi
-	done
+restore_program() {
+    local program="$1"
+
+    if program_exists "$program" && dir_exists "$program"; then
+        folder="$DOTFILES/$program"
+        if confirmation "$program"; then
+            cd "$DOTFILES"
+            stow -v "$program"
+            echo -e "$folder ${magenta}restored${nc}"
+            echo
+        fi
+    fi
 }
 
-main() {
-	for program in "${PROGRAMS[@]}"; do
-		restore "$program"
-	done
+check_dependencies() {
+    local programs="fzf stow fd"
+    for program in $programs; do
+        if ! program_exists "$program"; then
+            err "'$program' not found"
+            exit 1
+        fi
+    done
+}
+
+restore_array() {
+    # FIX: better naming
+    for program in "${PROGRAMS[@]}"; do
+        restore_program "$program"
+    done
 }
 
 selection() {
+    # shellcheck disable=2012
+    selection=$(fd . -d 1 -t d "$DOTFILES" -x basename | fzf \
+        --layout=reverse-list \
+        --height=45% \
+        --border=sharp \
+        --prompt="$PROGRAM> " \
+        --pointer='→' \
+        --ansi \
+        --multi \
+        --no-preview)
 
-	# shellcheck disable=2012
-	# selection=$(ls "$DOTFILES" | fzf \
-	selection=$(fd . -d 1 -t d "$DOTFILES" -x basename | fzf \
-		--layout=reverse-list \
-		--height=45% \
-		--border=sharp \
-		--prompt="$PROGRAM> " \
-		--pointer='→' \
-		--ansi \
-		--multi \
-		--no-preview)
+    [[ -z "$selection" ]] && exit 1
 
-	[[ -z "$selection" ]] && exit 1
-
-	for selected in $selection; do
-		restore "$selected"
-	done
+    for selected in $selection; do
+        restore_program "$selected"
+    done
 }
 
 usage() {
-	echo
-	echo "Usage: $PROGRAM <command>"
-	echo
-	echo "command:"
-	echo " pick          Pick a program to restore"
-	exit 0
+    echo
+    echo "Usage: $PROGRAM <command>"
+    echo
+    echo "command:"
+    echo " pick          Pick a program to restore"
+    exit 0
 }
 
-dependencies
+main() {
+    local arg
+    arg="$1"
+
+    check_dependencies
+
+    case "$arg" in
+    pick) selection ;;
+    *) restore_array ;;
+    esac
+}
+
 if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
-	usage
+    usage
 fi
 
-case "$1" in
-pick)
-	selection
-	;;
-*) main ;;
-esac
+main "$@"

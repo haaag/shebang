@@ -51,7 +51,7 @@ function notify {
 function toggle_redshift {
     local msg
     if pgrep -x redshift >/dev/null; then
-        msg="toggle redshit"
+        msg="toggle redshift"
         logme "$msg"
         notify "$msg"
         pkill -USR1 redshift
