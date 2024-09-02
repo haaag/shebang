@@ -6,21 +6,21 @@ shopt -s nullglob globstar
 # - [X] remove `fzf` deps
 # - [ ] remove hex-colors, use names: red, blue...
 
-PROG=$(basename "$0")
+PROG="${0##*/}"
 DEPS=(notify-send xdotool pass)
 PASS=$(which pass)
 
-# Vars
+# vars
 # shellcheck disable=SC2034
 EDITOR="nvim -u NONE"
 TERMINAL=${TERMINAL:-st}
 PASSWORD_STORE_CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-15}
 
-# Menu
+# menu
 MENU="dmenu"
 declare -a MENU_ARGS=(-l 10)
 
-# Colors
+# colors
 BLUE="#458588"
 MAGENTA="#D3869B"
 RED="#FB4934"
@@ -48,16 +48,9 @@ function log_err {
 
 function send_notification {
     local mesg="$1"
-    local cmd="dunstify"
-    declare -a args
-
-    if ! command -v "$cmd" >/dev/null; then
-        cmd="notify-send"
-    else
-        args+=(--hints="string:x-dunst-stack-tag:pass")
-    fi
-
-    args+=(--icon="dialog-password-symbolic")
+    local cmd=notify-send
+    declare -a args=(-i "dialog-password-symbolic")
+    args+=(-h "string:x-dunst-stack-tag:pass")
     args+=(-r 888)
     "$cmd" "${args[@]}" "$PROG" "$mesg"
 }
@@ -103,21 +96,23 @@ function edit_pwd {
 }
 
 function menu {
-    local icon pwd
-    icon=""
-    pwd=$(get_pass_with_menu "${icon} Password> " "-sb" "$BLUE")
+    local icon=""
+    local password mesg
+    password=$(get_pass_with_menu "${icon} Password> " "-sb" "$BLUE")
 
-    [[ -z "${pwd}" ]] && exit
+    [[ -z "${password}" ]] && exit
 
-    "$PASS" show -c "$pwd" 2>/dev/null
+    "$PASS" show -c "$password" 2>/dev/null
     retcode=$?
 
     if [[ "$retcode" -ne 0 ]]; then
-        send_notification "No password found for <b>${pwd}</b>"
-        log_err "no password found for '${pwd}'"
+        send_notification "No password found for <b>${password}</b>"
+        log_err "no password found for '${password}'"
     fi
 
-    send_notification "Copied $icon <b>${pwd}</b> to clipboard.\n\nWill clear in 15 seconds."
+    mesg="Copied $icon <b>${password}</b> to clipboard.\n\n"
+    mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
+    send_notification "$mesg"
     exit 0
 }
 
@@ -130,37 +125,37 @@ function list_path {
 }
 
 function otp_code {
-    local icon pwd mesg
-    icon=""
-    pwd=$(get_pass_with_menu "${icon} PassOTP> " "-sb" "$YELLOW")
+    local password mesg
+    local icon=""
+    password=$(get_pass_with_menu "${icon} PassOTP> " "-sb" "$YELLOW")
 
-    [[ -z "${pwd}" ]] && exit
+    [[ -z "${password}" ]] && exit
 
-    "$PASS" otp -c "${pwd}"
+    "$PASS" otp -c "${password}"
     retcode=$?
 
     if [[ "$retcode" -gt 0 ]]; then
-        send_notification "No OTP found for <b>${pwd}</b>"
-        log_err "no OTP found for ${pwd}"
+        send_notification "No OTP found for <b>${password}</b>"
+        log_err "no OTP found for ${password}"
     fi
 
-    mesg="Copied $icon <b>OTP code</b> for <b>${pwd}</b> to clipboard.\n\n"
-    mesg+="<i>Will clear in ${PASSWORD_STORE_CLIP_TIME} seconds.</i>"
+    mesg="Copied $icon <b>OTP</b> code for <b>${password}</b> to clipboard.\n\n"
+    mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
     send_notification "$mesg"
     exit 0
 }
 
 function type_pwd {
     shift
-    local pwd="$1"
+    local password="$1"
 
-    if [[ -z "${pwd}" ]]; then
-        pwd=$(get_pass_with_menu "PassType>" "-sb" "$MAGENTA")
+    if [[ -z "${password}" ]]; then
+        password=$(get_pass_with_menu "PassType>" "-sb" "$MAGENTA")
     fi
 
-    [[ -z "${pwd}" ]] && exit
+    [[ -z "${password}" ]] && exit
 
-    "$PASS" show "$pwd" | {
+    "$PASS" show "$password" | {
         IFS= read -r pass
         printf %s "$pass"
     } | $XDOTOOL
@@ -176,13 +171,25 @@ else
     log_err "no wayland or x11 display detected" >&2
 fi
 
-function main {
+function check_pass {
+    local retcode
+    "$PASS" >/dev/null
+    retcode="$?"
+    return "$retcode"
+}
 
+function main {
     for cmd in "${DEPS[@]}"; do
         if ! command -v "$cmd" >/dev/null; then
             log_err "'$cmd' not found"
         fi
     done
+
+    if ! check_pass; then
+        err_msg="'pass' returned a <b>non-zero</b> code."
+        send_notification "$err_msg"
+        log_err "$err_msg"
+    fi
 
     case "$1" in
     -m | --menu) menu ;;
