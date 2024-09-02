@@ -8,7 +8,7 @@
 # https://github.com/flameshot-org/flameshot
 
 PROG=$(basename "$0")
-DEPENDENCIES=(flameshot convert nsxiv)
+DEPENDENCIES=(flameshot magick)
 DEF_LOCATION="${XDG_PICTURES_DIR:-$HOME/shares/pic}"/screenshots
 
 function log_err {
@@ -28,39 +28,42 @@ function pre_exit {
     exit 0
 }
 
-function notify {
+function send_notification {
     local mesg="$1"
-    local cmd
-
-    if command -v dunstify >/dev/null; then
-        cmd=dunstify
-    else
-        cmd=notify-send
-    fi
-
-    "$cmd" -i flameshot "$PROG" "$mesg"
+    notify-send -i flameshot "$PROG" "$mesg"
 }
 
 function open {
-    local image width height
-    image="$1"
-
+    local image="$1"
     [[ ! -f "${image}" ]] && log_err "'${image}' not found"
+    xdg-open "${image}" 2>/dev/null
+}
 
-    width=$(identify -format "%w" "$image") >/dev/null
-    height=$(identify -format "%h" "$image") >/dev/null
-    nsxiv --geometry="${width}x${height}" "${image}" 2>/dev/null
+function set_path {
+    local path="$1"
+
+    if [[ -n "$path" ]]; then
+        path=$(realpath "$path")
+    else
+        path=$DEF_LOCATION
+    fi
+
+    echo "$path"
 }
 
 function get_last_created {
+    local path="$1"
     local image
-    image=$(find "${DEF_LOCATION}" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d ' ' -f2-)
+    image=$(find "${path}" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d ' ' -f2-)
     echo "${image}"
 }
 
 function pretty {
-    local filesize image image_tmp
+    local filesize image image_tmp path
     image_tmp=$(mktemp --tmpdir "$PROG.XXXXX")
+
+    shift
+    path=$(set_path "$1")
 
     # shellcheck disable=SC2064
     trap "pre_exit $image_tmp" EXIT
@@ -74,7 +77,7 @@ function pretty {
     fi
 
     # add corners
-    convert "$image_tmp" \
+    magick "$image_tmp" \
         \( +clone -alpha extract \
         -draw 'fill black polygon 0,0 0,15 15,0 fill white circle 15,15 15,0' \
         \( +clone -flip \) -compose Multiply -composite \
@@ -82,45 +85,41 @@ function pretty {
         \) -alpha off -compose CopyOpacity -composite "$image_tmp"
 
     # shadow
-    convert "$image_tmp" \
+    magick "$image_tmp" \
         \( +clone -background black -shadow 40x5+0+0 \) \
         +swap -background none -layers merge +repage "$image_tmp"
 
     # white backdrop
-    convert "$image_tmp" -bordercolor white -border 10 "$image_tmp"
+    magick "$image_tmp" -bordercolor white -border 10 "$image_tmp"
 
     # copy image
-    image="${DEF_LOCATION}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
+    image="${path}/pretty-$(date +%Y-%m-%d_%H:%M:%S).png"
     cp -v "$image_tmp" "${image}"
 
-    notify "Screenshot saved at <b>${DEF_LOCATION}</b>"
+    send_notification "Screenshot saved at <b>${path}</b>"
     open "${image}"
 }
 
 function normal {
-    local retcode
-    flameshot gui --clipboard --path "${DEF_LOCATION}" 2>/dev/null
+    local retcode path
+    shift
+    path=$(set_path "$1")
+
+    flameshot gui --clipboard --path "${path}" 2>/dev/null
 
     retcode="$?"
     if [[ "${retcode}" -ne 0 ]]; then
         exit "${retcode}"
     fi
 
-    open "$(get_last_created)"
+    open "$(get_last_created "$path")"
 }
 
 function desktop {
-    local retcode
-    local filename
+    local retcode filename path
 
     shift
-    local path="$1"
-
-    if [[ -n "$path" ]]; then
-        path=$(realpath "$path")
-    else
-        path=$DEF_LOCATION
-    fi
+    path=$(set_path "$1")
 
     filename="${path}/$(date +%Y-%m-%d_%H:%M:%S)_desktop.png"
 
@@ -154,8 +153,8 @@ function main {
     done
 
     case "$1" in
-    -n | *normal) normal ;;
-    -p | *pretty) pretty ;;
+    -n | *normal) normal "$@" ;;
+    -p | *pretty) pretty "$@" ;;
     -d | *desktop | *full) desktop "$@" ;;
     *) help ;;
     esac
