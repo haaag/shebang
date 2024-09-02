@@ -14,7 +14,7 @@ PROG=$(basename "$0")
 MIC_INTERNAL=(1 Capture)
 MIC_EXT=(2 Mic)
 MIC_EXT_NAME="samson"
-DEPS=(dunstify amixer)
+DEPS=(amixer)
 
 declare -A CAPTURES
 CAPTURES["internal"]="${MIC_INTERNAL[*]}"
@@ -55,15 +55,14 @@ function log_msg {
     printf "%s: %s\n" "$PROG" "$*"
 }
 
-function notify {
-    local icon title mesg args
-    icon="$1"
-    title="$2"
-    mesg="$3"
-    declare -a args=(--appname="$PROG")
-    args+=(--icon "$icon" --timeout 3000)
-    args+=(--hints string:x-dunst-stack-tag:microphone)
-    dunstify "${args[@]}" "$title" "$mesg"
+function send_notification {
+    local icon="$1"
+    local title="$2"
+    local mesg="$3"
+    local args
+    declare -a args=(-a "$PROG" -i "$icon" -t 3000)
+    args+=(-h string:x-dunst-stack-tag:microphone)
+    notify-send "${args[@]}" "$title" "$mesg"
 }
 
 function is_connected {
@@ -164,14 +163,14 @@ function toggle-micro {
 
     if ! is_connected "$card" "$mic"; then
         local err_msg="'$name' not found"
-        notify "${NOTIFY_ERR}" "toggle" "${err_msg}"
+        send_notification "${NOTIFY_ERR}" "toggle" "${err_msg}"
         log_error "${err_msg}"
     fi
 
     if is_power_on "$card" "$mic"; then
-        notify "$NOTIFY_DISABLE" "🔴 $PROG" "Microphone '$name' Disable"
+        send_notification "$NOTIFY_DISABLE" "🔴 $PROG" "Microphone '$name' Disable"
     else
-        notify "$NOTIFY_ENABLE" "🟢 $PROG" "Microphone '$name' Enable"
+        send_notification "$NOTIFY_ENABLE" "🟢 $PROG" "Microphone '$name' Enable"
     fi
 
     amixer -c "$card" sset "$mic" toggle &>/dev/null
@@ -197,7 +196,7 @@ function disable-micro {
 
     if ! is_connected "$card" "$mic"; then
         local err_msg="'$name' not found"
-        notify "${NOTIFY_ERR}" "disable" "${err_msg}"
+        send_notification "${NOTIFY_ERR}" "disable" "${err_msg}"
         log_error "${err_msg}"
     fi
 
@@ -206,7 +205,7 @@ function disable-micro {
     fi
 
     amixer -c "$card" set "$mic" nocap &>/dev/null
-    notify "$NOTIFY_DISABLE" "🔴 $PROG" "Microphone '$1' Disable"
+    send_notification "$NOTIFY_DISABLE" "🔴 $PROG" "Microphone '$1' Disable"
 }
 
 function enable-micro {
@@ -223,7 +222,7 @@ function enable-micro {
 
     if ! is_connected "$card" "$mic"; then
         local err_msg="'$name' not found"
-        notify "${NOTIFY_ERR}" "enable" "${err_msg}"
+        send_notification "${NOTIFY_ERR}" "enable" "${err_msg}"
         log_error "${err_msg}"
     fi
 
@@ -232,7 +231,7 @@ function enable-micro {
     fi
 
     amixer -c "$card" set "$mic" cap &>/dev/null
-    notify "$NOTIFY_ENABLE" "🟢 $PROG" "Microphone '$1' Enable"
+    send_notification "$NOTIFY_ENABLE" "🟢 $PROG" "Microphone '$1' Enable"
 }
 
 function main {
@@ -253,7 +252,7 @@ function main {
 
 for dep in "${DEPS[@]}"; do
     if ! command -v "$dep" >/dev/null; then
-        notify "$NOTIFY_ERR" "$PROG" "$dep not found"
+        send_notification "$NOTIFY_ERR" "$PROG" "$dep not found"
         log_error "$dep not found"
     fi
 done
