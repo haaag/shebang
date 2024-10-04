@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 
+# script to hibernate/suspend with `zzz/ZZZ`
+#
+# this script sets timers and lock files.
+# dependency: 'hibernate-loop' script
+
 PROG="${0##*/}"
 CURRENT_TIME=$(date +%s)
 LOGGER="${LOGS_PATH:-$HOME/dcs/log}/suspend-hibernate.log"
 
 # AC offline in minutes
-HIBERNATE_DELAY=45
+HIBERNATE_DELAY=60
 # AC online in minutes
-HIBERNATE_DELAY_CHAR=60
+HIBERNATE_DELAY_CHAR=90
 
 # lock files
 LOCKS=$HOME

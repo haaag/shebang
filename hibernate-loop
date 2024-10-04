@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
-# Script to hibernate/suspend with `zzz/ZZZ`
+# script to hibernate/suspend with `zzz/ZZZ`
 #
-# This script monitors specific lock files to manage system hibernation and
+# this script monitors specific lock files to manage system hibernation and
 # suspension.
-# It runs continuously in the background, checking for the presence of lock
-# files to determine whether to trigger hibernation or perform other actions.
+# it runs continuously in the background, checking for the presence of lock
+# files to determine whether to trigger hibernation.
+# dependency: 'suspend-hybrid' script
 
 PROG="${0##*/}"
 LOGGER="${LOGS_PATH:-$HOME/dcs/log}/suspend-hibernate.log"
@@ -18,7 +19,7 @@ WAKEUP_LOCK="$LOCKS/wakeup.lock"
 MANUAL_LOCK="$LOCKS/manual.lock"
 SLEEP=5s
 
-# Logs messages with timestamps and script name to the log file.
+# logs messages with timestamps and script name to the log file.
 function logger {
     local now
     if [[ ! -f "$LOGGER" ]]; then
@@ -29,19 +30,37 @@ function logger {
     echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
 }
 
-# Prints a separator line in the log file.
+function send_notification {
+    local prog
+    local mesg="<b>$1</b>"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -r 938 -i dialog-warning "$prog" "$mesg"
+}
+
+# prints a separator line in the log file.
 function line {
     local w="79"
     local char="-"
     printf "%${w}s\n" | sed "s/ /$char/g"
 }
 
-# Adds a separator line to the log file.
+# adds a separator line to the log file.
 function separator {
     line | tee -a "$LOGGER"
 }
 
-# Checks if the manual lock file exists.
+# checks if one of the lockers are seen.
+function seen {
+    local trigger="$1"
+    if [[ ! -f "$trigger" ]]; then
+        return 1
+    fi
+
+    logger "found $trigger"
+    return 0
+}
+
+# checks if the manual lock file exists.
 function is_manual_hibernate {
     if [[ ! -f "$MANUAL_LOCK" ]]; then
         return 1
@@ -51,7 +70,7 @@ function is_manual_hibernate {
     return 0
 }
 
-# Removes a specified lock file and logs the action.
+# removes a specified lock file and logs the action.
 function remove_lock {
     local file="$1"
 
@@ -59,11 +78,12 @@ function remove_lock {
         return
     fi
 
-    rm -f "$file" && logger "removing $file"
+    logger "removing $file"
+    rm -f "$file"
     sleep 0.5
 }
 
-# Creates a specified file and logs the action.
+# creates a specified file and logs the action.
 function create_file {
     local file="$1"
     touch "$file"
@@ -71,7 +91,7 @@ function create_file {
     sleep 0.3
 }
 
-# Checks if the automatic hibernate lock file exists.
+# checks if the automatic hibernate lock file exists.
 function is_ready_to_hibernate {
     if [[ ! -f "$HIBERNATE_LOCK" ]]; then
         return 1
@@ -81,7 +101,7 @@ function is_ready_to_hibernate {
     return 0
 }
 
-# Creates a wakeup lock file and triggers the hibernation process
+# creates a wakeup lock file and triggers the hibernation process
 # using sudo ZZZ.
 function suspend_hybrid {
     logger "setting up to after wake-up"
@@ -89,7 +109,11 @@ function suspend_hybrid {
 
     logger "entering hibernate-mode...sudo ZZZ"
     separator
-    sudo ZZZ
+    # sudo ZZZ
+}
+
+function pre_exit {
+    remove_lock "$LOGGER"
 }
 
 for dep in "${DEPS[@]}"; do
@@ -101,15 +125,19 @@ done
 
 logger "started at $(date)"
 
+trap pre_exit EXIT SIGTERM
+
 while true; do
-    if is_ready_to_hibernate; then
+    if seen "$HIBERNATE_LOCK"; then
         remove_lock "$HIBERNATE_LOCK"
+        suspend_hybrid
+    elif seen "$MANUAL_LOCK"; then
+        remove_lock "$MANUAL_LOCK"
         suspend_hybrid
     fi
 
-    if is_manual_hibernate; then
-        remove_lock "$MANUAL_LOCK"
-        suspend_hybrid
+    if seen "$WAKEUP_LOCK"; then
+        send_notification "file '$WAKEUP_LOCK' found. Won't hibernate"
     fi
 
     sleep "$SLEEP"
