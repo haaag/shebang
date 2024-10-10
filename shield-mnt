@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+PROG=$(basename "$0")
+
+function log_err {
+    printf "%s: %s\n" "$PROG" "$*"
+    exit 1
+}
+
+if ! command -v pass >/dev/null; then
+    log_err "'pass' not found"
+fi
+
+mapfile -t PASSDATA < <(pass show devices/shield)
+USERNAME="${PASSDATA[0]}"
+PASSWORD="${PASSDATA[1]}"
+URI="${PASSDATA[2]}"
+DEST="${PASSDATA[3]}"
+
+VARS=(USERNAME PASSWORD URI)
+for var in "${VARS[@]}"; do
+    if [[ -z "${!var}" ]]; then
+        log_err "var '$var' is not set or empty."
+    fi
+done
+
+if [[ ! -d "$DEST" ]]; then
+    log_err "path not found: '$DEST'"
+fi
+
+function is_mounted {
+    if ! mountpoint "$DEST" >/dev/null; then
+        return 1
+    fi
+    return 0
+}
+
+function mount_shield {
+    if is_mounted; then
+        log_err "shield already mounted on '$DEST'"
+    fi
+
+    sudo mount -t cifs -w \
+        --options username="$USERNAME" \
+        --options password="$PASSWORD" "$URI" "$DEST"
+}
+
+function umount_shield {
+    if ! is_mounted; then
+        log_err "shield is not mounted"
+    fi
+
+    sudo umount "$DEST"
+}
+
+function usage {
+    cat <<-_EOF
+usage: $PROG [options]
+
+options:
+    -m, mount       mount shield
+    -u, umount      umount shield
+    -h, help        show this help
+_EOF
+    exit
+}
+
+case "$1" in
+-m | mount) mount_shield ;;
+-u | umount) umount_shield ;;
+*) usage ;;
+esac
