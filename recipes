@@ -7,18 +7,33 @@
 # Script to open my recipes in zathura
 
 PROG=$(basename "$0")
-ROOT="$HOME/docs/vimwiki/cookbook/"
+ROOT="${XDG_DOCUMENTS_DIR:-}/vimwiki/cookbook/"
 TMP="/tmp"
 TERMINAL=${TERMINAL:-st}
-DEPS=(pandoc zathura find)
+DEPS=(pandoc zathura find pdflatex)
 
-declare -a COOKS
-readarray -t COOKS < <(find "$ROOT" -type f -name "*.md" -exec basename {} \;)
+function send_notification {
+    local prog
+    local mesg="<b>$1</b>"
+    local icon="cookie"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i "$icon" "$prog" "$mesg"
+}
 
 function log_err {
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
 }
+
+if [[ ! -d "$ROOT" ]]; then
+    err_msg="path not found: $ROOT"
+    send_notification "$err_msg"
+    log_err "$err_msg"
+fi
+
+# load files
+declare -a COOKS
+readarray -t COOKS < <(find "$ROOT" -type f -name "*.md" -exec basename {} \;)
 
 function list_recipes {
     local recipe
@@ -29,8 +44,6 @@ function list_recipes {
 function select_recipe {
     local recipe
     recipe=$(list_recipes)
-
-    [[ -z "${recipe}" ]] && exit 1
 
     echo "$recipe"
 }
@@ -52,6 +65,9 @@ function convert_recipe {
 function open_recipe {
     local recipe
     recipe=$(select_recipe)
+
+    [[ -z "${recipe}" ]] && exit 1
+
     file=$(find "$ROOT" -type f -name "${recipe}")
     pdf=$(convert_recipe "${file}")
 
