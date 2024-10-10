@@ -19,7 +19,6 @@ LOCKS=$HOME
 SUSPEND_LOCK="$LOCKS"/suspend.lock
 HIBERNATE_LOCK="$LOCKS/hibernate.lock"
 WAKEUP_LOCK="$LOCKS/wakeup.lock"
-MANUAL_LOCK="$LOCKS/manual.lock"
 TIMER="/tmp/timer.log"
 
 function usage {
@@ -123,7 +122,7 @@ function log_to {
 }
 
 function manual_hibernate {
-    create_file "$MANUAL_LOCK"
+    create_file "$HIBERNATE_LOCK"
     logger "setting for manual hibernate..."
     quit 0
 }

@@ -16,7 +16,6 @@ DEPS=(zzz ZZZ tee)
 LOCKS=$HOME
 HIBERNATE_LOCK="$LOCKS/hibernate.lock"
 WAKEUP_LOCK="$LOCKS/wakeup.lock"
-MANUAL_LOCK="$LOCKS/manual.lock"
 SLEEP=5s
 
 # logs messages with timestamps and script name to the log file.
@@ -88,7 +87,7 @@ function create_file {
     local file="$1"
     touch "$file"
     logger "creating $file"
-    sleep 0.3
+    sleep 0.5
 }
 
 # checks if the automatic hibernate lock file exists.
@@ -109,7 +108,7 @@ function suspend_hybrid {
 
     logger "entering hibernate-mode...sudo ZZZ"
     separator
-    # sudo ZZZ
+    sudo ZZZ
 }
 
 function pre_exit {
@@ -131,13 +130,6 @@ while true; do
     if seen "$HIBERNATE_LOCK"; then
         remove_lock "$HIBERNATE_LOCK"
         suspend_hybrid
-    elif seen "$MANUAL_LOCK"; then
-        remove_lock "$MANUAL_LOCK"
-        suspend_hybrid
-    fi
-
-    if seen "$WAKEUP_LOCK"; then
-        send_notification "file '$WAKEUP_LOCK' found. Won't hibernate"
     fi
 
     sleep "$SLEEP"
