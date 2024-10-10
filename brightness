@@ -1,111 +1,111 @@
 #!/usr/bin/env bash
 
 # Script for managing brightness
+# dependency: brillo <https://gitlab.com/cameronnemo/brillo>
 
 PROG=$(basename "$0")
 CMD="brillo"
-DEPS=("$CMD" dunstify)
+DEPS=("$CMD")
 
-get_brightness() {
-	local current
-	current=$("$CMD" -G)
-	echo "${current%.*}"
+function get_brightness {
+    local current
+    current=$("$CMD" -G)
+    echo "${current%.*}"
 }
 
-status_bar() {
-	local icon low mid high brightness
-	low=""
-	mid=""
-	high=""
-	brightness=$(get_brightness)
+function status_bar {
+    local icon low mid high brightness
+    low=""
+    mid=""
+    high=""
+    brightness=$(get_brightness)
 
-	if [[ "$brightness" -lt "30" ]]; then
-		icon="$low"
-	elif [[ "$brightness" -lt "70" ]]; then
-		icon="$mid"
-  else
-		icon="$high"
-	fi
+    if [[ "$brightness" -lt "30" ]]; then
+        icon="$low"
+    elif [[ "$brightness" -lt "70" ]]; then
+        icon="$mid"
+    else
+        icon="$high"
+    fi
 
-	printf "%s" "$SEP1"
-	printf "%s %s\n" "$icon" "$brightness%"
-	printf "%s" "$SEP2"
-	exit 0
+    printf "%s" "$SEP1"
+    printf "%s %s\n" "$icon" "$brightness%"
+    printf "%s" "$SEP2"
+    exit 0
 }
 
-get_notify_icon() {
-	local brightness icon low mid high
-	high=display-brightness-high-symbolic
-	low=display-brightness-low-symbolic
-	mid=display-brightness-medium-symbolic
-	brightness=$(get_brightness)
+function get_notify_icon {
+    local brightness
+    local high=display-brightness-high-symbolic
+    local low=display-brightness-low-symbolic
+    local mid=display-brightness-medium-symbolic
+    brightness=$(get_brightness)
 
-	if [[ "$brightness" -lt "30" ]]; then
-		icon="$low"
-	elif [[ "$brightness" -lt "70" ]]; then
-		icon="$mid"
-  else
-		icon="$high"
-	fi
+    if [[ "$brightness" -lt "30" ]]; then
+        icon="$low"
+    elif [[ "$brightness" -lt "70" ]]; then
+        icon="$mid"
+    else
+        icon="$high"
+    fi
 
-	echo "${icon}"
+    echo "${icon}"
 }
 
-notify() {
-	local brightness args
-  declare -a args=()
-  args+=(--appname "Brightness" "Brightness" "Brightness")
-  args+=(--icon "$(get_notify_icon)")
-  args+=(--hints string:x-canonical-private-synchronous:brightness)
-  args+=(--hints int:value:"$(get_brightness)")
-  dunstify "${args[@]}"
+function notify {
+    local brightness args
+    declare -a args=(-a "Brightness" "Brightness" "Brightness")
+    args+=(-i "$(get_notify_icon)")
+    args+=(-h string:x-canonical-private-synchronous:brightness)
+    args+=(-h int:value:"$(get_brightness)")
+    notify-send "${args[@]}"
 }
 
-increase() {
-	"$CMD" -A "$1"
+function increase {
+    "$CMD" -A "$1"
 }
 
-decrease() {
-	"$CMD" -U "$1"
+function decrease {
+    "$CMD" -U "$1"
 }
 
-usage() {
-	cat <<-_EOF
-		Usage: $PROG [INC|DEC] [VALUE]
+function usage {
+    cat <<-_EOF
+Usage: $PROG [INC|DEC] [VALUE]
 
-		Simple script for managing brightness
+Simple script for managing brightness
 
-		Options:
-		 -i, inc        Increase brightness by 5%
-		 -d, dec        Decrease brightness by 5%
-		 -s, status     Show current brightness
-		 -h, help       Show this Help
-	_EOF
-	exit
+Options:
+    -i, inc        Increase brightness by 5%
+    -d, dec        Decrease brightness by 5%
+    -s, status     Show current brightness
+    -h, help       Show this Help
+_EOF
+    exit
 }
 
-main() {
-  local option
-  option="$1"
+function main {
+    local option
+    option="$1"
 
-	for cmd in "${DEPS[@]}"; do
-		if ! command -v "$cmd" >/dev/null; then
-			echo "$PROG: '$cmd' command not found."
-			exit 1
-		fi
-	done
+    for cmd in "${DEPS[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            echo "$PROG: '$cmd' command not found."
+            exit 1
+        fi
+    done
 
-  shift 
+    shift
 
-	case "$option" in
-	-i | inc) increase "${1:-3}" ;;
-	-d | dec) decrease "${1:-3}" ;;
-	-s | status) status_bar ;;
-  -h | help | --help) usage ;;
-	*) status_bar ;;
-	esac
+    case "$option" in
+    -i | inc) increase "${1:-3}" ;;
+    -d | dec) decrease "${1:-3}" ;;
+    -s | status) status_bar ;;
+    -h | help | --help) usage ;;
+    *) status_bar ;;
+    esac
 
-	notify
+    notify
 }
 
 main "$1" "$2"
