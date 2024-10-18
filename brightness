@@ -36,9 +36,9 @@ function status_bar {
 
 function get_notify_icon {
     local brightness
-    local high=display-brightness-high-symbolic
-    local low=display-brightness-low-symbolic
-    local mid=display-brightness-medium-symbolic
+    local high=brightness-high-symbolic
+    local low=brightness-low-symbolic
+    local mid=brightness-medium-symbolic
     brightness=$(get_brightness)
 
     if [[ "$brightness" -lt "30" ]]; then
