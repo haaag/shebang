@@ -53,7 +53,9 @@ function main {
 
     for dep in "${DEPS[@]}"; do
         if ! command -v "$dep" >/dev/null; then
-            log_err "'$dep' not found"
+            local err_msg="'$dep' not found"
+            send_notification "$err_msg"
+            log_err "$err_msg"
         fi
     done
 
@@ -68,7 +70,7 @@ function main {
 
     [[ -n "$timer" ]] && SUSPEND_TIME=$timer
     setsid -f "$CMD" -time "$SUSPEND_TIME" -locker "$LOCKER" -detectsleep
-    send_notification "Setting locker to ${SUSPEND_TIME}m"
+    send_notification "<i>Setting locker to</i> ${SUSPEND_TIME}m"
 }
 
 main "$@"
