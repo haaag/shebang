@@ -47,6 +47,7 @@ function in_terminal {
 }
 
 function err {
+    # shellcheck disable=SC2317
     echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2
 }
 
@@ -64,6 +65,10 @@ function log_err {
 function err_and_exit {
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
+}
+
+function err {
+    printf "%s: %s\n" "$PROG" "$*" >&2
 }
 
 function warning {
@@ -121,22 +126,22 @@ function delay_exit {
 }
 
 function notification {
-    local title mesg
-    title="$1"
-    mesg="$2"
+    local title="$1"
+    local mesg="$2"
     notify-send "$title" "$mesg"
 }
 
 function send_notification {
     local prog
     local mesg="<b>$1</b>"
+    local icon="${2:-dialog-warning}"
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
-    notify-send -i grsync "$prog" "$mesg"
+    notify-send -i "$icon" "$prog" "$mesg"
 }
 
 function confirm {
     local answer
-    echo -n "Are you sure you want to continue? ${GRAY}[y/N]:${NC} "
+    echo -n "are you sure you want to continue? ${GRAY}[y/N]:${NC} "
     read -r answer
 
     case "$answer" in
@@ -144,6 +149,26 @@ function confirm {
     n | N) return 1 ;;
     *) return 1 ;;
     esac
+}
+
+function die {
+    (($# > 0)) && err "$*"
+    exit 1
+}
+
+function has {
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && err "$c not found"
+            return 1
+        fi
+    done
 }
 
 # Only in ZSH

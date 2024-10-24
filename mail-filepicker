@@ -1,12 +1,15 @@
-# !/bin/sh
+#!/usr/bin/env bash
 
 tmpfile=$HOME/.config/mutt/tmpfile
 
-if [ -z "$1" ]; then
-	nnn -p $tmpfile && sed -i 's/ /^V /g' $tmpfile &&
-		echo "$(awk 'BEGIN {printf "%s", "push "} {printf "%s", "<attach-file>\""$0"\"<enter>"}' $tmpfile)" >$tmpfile
-elif [ "$1" == "clean" ]; then
-	rm $tmpfile
+if [[ -z "$1" ]]; then
+    # shellcheck disable=SC2086
+    # shellcheck disable=SC2005
+    nnn -p $tmpfile && sed -i 's/ /^V /g' $tmpfile &&
+        echo "$(awk 'BEGIN {printf "%s", "push "} {printf "%s", "<attach-file>\""$0"\"<enter>"}' $tmpfile)" >$tmpfile
+elif [[ "$1" == "clean" ]]; then
+    # shellcheck disable=SC2086
+    rm $tmpfile
 fi
 
 # vim: ft=sh

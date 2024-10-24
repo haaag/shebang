@@ -5,7 +5,7 @@
 # Output: [ DEVICE 98%,  DEVICE 42%]
 
 PROG=$(basename "$0")
-LOGGER="${LOGS_PATH:-$HOME/docs/log}/${PROG}.log"
+LOGGER="${LOGS_PATH:-$HOME/dcs/log}/${PROG}.log"
 
 # devices icon
 ICON_HEADPHONES="" #  

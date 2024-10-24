@@ -13,7 +13,7 @@ set -o pipefail
 
 PROG=$(basename "$0")
 DEPS=(mpv curl perl)
-LOGGER="${LOGS_PATH:-$HOME/docs/log}/${PROG}.log"
+LOGGER="${LOGS_PATH:-$HOME/dcs/log}/${PROG}.log"
 XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 PROMPT="  ${PROG}>"
 

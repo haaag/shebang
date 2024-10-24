@@ -8,7 +8,7 @@
 
 PROG=$(basename "$0")
 CMD="transmission-daemon"
-declare -a DEPS=(transmission-add tremc)
+declare -a DEPS=(tm-add tremc)
 
 function logme {
     printf "%s: %s\n" "$PROG" "$*"
@@ -44,7 +44,7 @@ function add_transmission {
         exit 1
     fi
 
-    transmission-add "$magnet" && notify-send "$msg"
+    tm-add "$magnet" && notify-send "$msg"
     logme "$msg"
 }
 

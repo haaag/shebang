@@ -41,13 +41,13 @@ function get_interface {
 }
 
 function get_icons {
-    icons=(                )
+    icons=(                 )
     icons+=(                )
     icons+=(          )
     icons+=(         )
     icons+=(                    )
     icons+=(               )
-    icons+=(              )
+    icons+=(              )
     icons+=(               )
 }
 
@@ -162,13 +162,14 @@ function main {
     programs["jellyfin"]=""
     programs["galculator"]=""
     programs["newsboat"]="" # "" # "" ""
+    programs["mpv"]="" #  # 
+    programs["signal-desktop"]="" # ""
+    programs["dragon"]=""
+    programs["telegram"]="" # ""
     # programs["tidal-hifi"]=""
     # programs["ytlocal"]=""
-    # programs["mpv"]="" #  # 
     # programs["xbps-install"]=""
-    programs["signal-desktop"]="" # ""
     # programs["nvim"]=""
-    # programs["telegram"]="" # ""
 
     mapfile -t icons < <(get_interface)
     icons+=("$(is_microphone_on)")

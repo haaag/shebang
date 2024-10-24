@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Script to display weather information in the dwm bar.
+# script to display weather information in the wm bar.
 #
 # Requires: jq curl
 # Optional: notify-send
@@ -10,6 +10,10 @@ PROG=$(basename "$0")
 DEPS=(jq curl)
 HUMIDITY=""
 #      
+
+# load envs
+# shellcheck source=/dev/null
+[[ -f "$PRIVATE_ROOT"/openweather ]] && source "$PRIVATE_ROOT"/openweather
 
 function notification {
     local date icon
@@ -27,10 +31,6 @@ function log_err {
     fi
     exit 1
 }
-
-# load envs
-# shellcheck source=/dev/null
-[[ -f "$PRIVATE_ROOT"/openweather ]] && source "$PRIVATE_ROOT"/openweather
 
 if [[ -z "$OPEN_WEATHERMAP_KEY" ]]; then
     log_err "openweather api not found."
@@ -100,7 +100,7 @@ function get_weather {
     fi
 }
 
-function dwm_weather {
+function notify_weather {
     local icon desc temp humidity message
     get_weather
     icon=$(get_icon "$weather_icon")
@@ -140,6 +140,6 @@ if ! curl -Is "${API}" >/dev/null; then
 fi
 
 case "$1" in
-*notify) dwm_weather ;;
+*notify) notify_weather ;;
 *) bar_weather ;;
 esac

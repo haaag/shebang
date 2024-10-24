@@ -168,7 +168,7 @@ if [[ -n $WAYLAND_DISPLAY ]]; then
 elif [[ -n $DISPLAY ]]; then
     XDOTOOL="xdotool type --clearmodifiers --file -"
 else
-    log_err "no wayland or x11 display detected" >&2
+    log_err "no x11/wayland display detected"
 fi
 
 function check_pass {

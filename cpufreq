@@ -17,11 +17,11 @@ set -o pipefail
 
 PROG=$(basename "$0")
 AVAILABLE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+CURRENT=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 GOVERNOR=(/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor)
 
 # notification
 DISPLAY=${DISPLAY:-:0}
-NOTI_ICON="power-profile-performance-symbolic"
 
 # always ask password
 sudo --askpass --reset-timestamp
@@ -67,15 +67,27 @@ function log_err {
 }
 
 function send_notification {
-    # check if calling from x11
     if [[ -z "$DISPLAY" ]]; then
         return
     fi
 
-    local msg="$1"
-    local icon="${2:-dialog-information}"
+    local prog
+    local mesg="<b>$1</b>"
+    local icon="${2:-dialog-warning}"
     local hints="string:x-canonical-private-synchronous:cpufreq"
-    notify-send -r 666 -a "$PROG" -i "$icon" -t 3000 "$PROG" "$msg" -h "$hints"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -r 666 -a "$PROG" -i "$icon" "$prog" "$mesg" -h "$hints"
+}
+
+function get_notification_icon {
+    local mode="$1"
+    if [[ "$mode" = "performance" ]]; then
+        echo "power-profile-performance-symbolic"
+        return
+    fi
+
+    echo "power-profile-power-saver-symbolic"
+    return
 }
 
 function logme {
@@ -130,9 +142,15 @@ function mode_set {
         return 1
     fi
 
+    if [[ "$mode" = "$CURRENT" ]]; then
+        logme "already in profile: $mode"
+        send_notification "current: <i>$mode</i>" "$(get_notification_icon "$mode")"
+        return
+    fi
+
     logme "setting to '$mode' mode" "$BLUE"
-    echo "$mode" | sudo tee "${GOVERNOR[@]}" >/dev/null
-    send_notification "🔴 setting to <b>$mode</b> mode" "$NOTI_ICON"
+    echo "$mode" | sudo -p "[sudo] setting to '$mode'  : " tee "${GOVERNOR[@]}" >/dev/null
+    send_notification "setting profile: <i><b>$mode</b></i>" "$(get_notification_icon "$mode")"
 }
 
 function show_stats {
@@ -140,9 +158,7 @@ function show_stats {
 }
 
 function show_current {
-    local governor
-    governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-    logme "$governor"
+    logme "$CURRENT"
 }
 
 function prompt {

@@ -14,7 +14,7 @@ set -e
 [[ -f "$HOME/.config/shell/colors.sh" ]] && . "$HOME/.config/shell/colors.sh"
 
 PROG=$(basename "$0")
-LOGGER="${LOGS_PATH:-$HOME/docs/log}/$(date '+%F_%H_%M')-mirror.log"
+LOGGER="${LOGS_PATH:-$HOME/dcs/log}/$(date '+%F_%H_%M')-mirror.log"
 DEPS=(rsync tput ping)
 DRYRUN=1
 
