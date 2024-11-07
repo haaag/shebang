@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+# simple file-selector and share with dragon-drop
+# deps: <nnn> <dragon-drop>
+
+PROG="${0##*/}"
+TMPFILE="/tmp/dragon.tmp"
+DEPS=(nnn dragon-drop)
+
+# shellcheck source=/dev/null
+[[ -f "$HOME/.config/shell/nnn.sh" ]] && . "$HOME/.config/shell/nnn.sh"
+
+function log_err {
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
+}
+
+function send_notification {
+    local prog
+    local mesg="<b>$1</b>"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i "gnome-user-share" "$prog" "$mesg"
+}
+
+function pre_exit {
+    if [[ ! -f "$TMPFILE" ]]; then
+        return
+    fi
+
+    printf "%s: %s\n" "$PROG" "cleaning up..."
+    rm "$TMPFILE" 2>/dev/null
+}
+
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" >/dev/null; then
+        err_msg="'$dep' not found."
+        send_notification "$err_msg"
+        log_err "$err_msg"
+    fi
+done
+
+trap pre_exit EXIT SIGTERM
+
+if [[ -n "$1" ]]; then
+    setsid -f dragon-drop -x "$1"
+    exit 0
+fi
+
+nnn -p "$TMPFILE"
+
+if [[ -f "$TMPFILE" ]]; then
+    setsid -f dragon-drop -x -I <"$TMPFILE"
+fi
