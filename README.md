@@ -14,3 +14,7 @@
 - [`wmprompt`](https://github.com/haaag/shebang/blob/main/wmprompt) - suckless system prompt
 - [`ytchannelid`](https://github.com/haaag/shebang/blob/main/ytchannelid) - extracts the `YTchannelID` from a given `URL` <small>(for newsboat)</small>
 - [`ytmpv`](https://github.com/haaag/shebang/blob/main/ytmpv) - play a video from a given url using `mpv` with notifications and logging
+
+## 🚧 WIP
+
+- [`vd`](https://github.com/haaag/shebang/blob/main/vd) - x binary package system [`xbps`](https://github.com/void-linux/xbps) helper -> [`voidlinux`](https://voidlinux.org/)
