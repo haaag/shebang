@@ -18,4 +18,5 @@
 
 ## 🚧 WIP
 
+- [`set-mimetypes`](https://github.com/haaag/shebang/blob/main/set-mimetypes) - set apps for `xdg-open`
 - [`vd`](https://github.com/haaag/shebang/blob/main/vd) - x binary package system [`xbps`](https://github.com/void-linux/xbps) helper -> [`voidlinux`](https://voidlinux.org/)

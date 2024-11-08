@@ -1,0 +1,258 @@
+#!/usr/bin/env bash
+
+# set apps for `xdg-open`
+
+PROG="${0##*/}"
+ROOT="${XDG_DATA_HOME:-}/applications"
+VERBOSE=false
+declare -A NOTSET
+
+# colors
+GREEN=$(tput setaf 2)
+RED=$(tput setaf 1)
+BLUE=$(tput setaf 4)
+YELLOW=$(tput setaf 3)
+RESET="$(tput sgr0)"
+
+declare -A DEFAULTS_APPS
+# email client
+DEFAULTS_APPS["x-scheme-handler/mailto"]="mailto.desktop"
+DEFAULTS_APPS["message/rfc822"]="mailto.desktop"
+# file explorer
+DEFAULTS_APPS["inode/directory"]="file.desktop"
+# images viewer
+DEFAULTS_APPS["image/bmp"]="img.desktop"
+DEFAULTS_APPS["image/gif"]="img.desktop"
+DEFAULTS_APPS["image/jpeg"]="img.desktop"
+DEFAULTS_APPS["image/jpg"]="img.desktop"
+DEFAULTS_APPS["image/png"]="img.desktop"
+DEFAULTS_APPS["image/tiff"]="img.desktop"
+DEFAULTS_APPS["image/x-bmp"]="img.desktop"
+DEFAULTS_APPS["image/x-portable-anymap"]="img.desktop"
+DEFAULTS_APPS["image/x-portable-bitmap"]="img.desktop"
+DEFAULTS_APPS["image/x-portable-graymap"]="img.desktop"
+DEFAULTS_APPS["image/x-tga"]="img.desktop"
+DEFAULTS_APPS["image/x-xpixmap"]="img.desktop"
+DEFAULTS_APPS["image/webp"]="img.desktop"
+DEFAULTS_APPS["image/heic"]="img.desktop"
+DEFAULTS_APPS["image/svg+xml"]="img.desktop"
+DEFAULTS_APPS["application/postscript"]="img.desktop"
+DEFAULTS_APPS["image/jp2"]="img.desktop"
+DEFAULTS_APPS["image/jxl"]="img.desktop"
+DEFAULTS_APPS["image/avif"]="img.desktop"
+DEFAULTS_APPS["image/heif"]="img.desktop"
+# text editor
+DEFAULTS_APPS["text/english"]="nvim.desktop"
+DEFAULTS_APPS["text/plain"]="nvim.desktop"
+DEFAULTS_APPS["text/x-makefile"]="nvim.desktop"
+DEFAULTS_APPS["text/x-c++hdr"]="nvim.desktop"
+DEFAULTS_APPS["text/x-c++src"]="nvim.desktop"
+DEFAULTS_APPS["text/x-chdr"]="nvim.desktop"
+DEFAULTS_APPS["text/x-csrc"]="nvim.desktop"
+DEFAULTS_APPS["text/x-java"]="nvim.desktop"
+DEFAULTS_APPS["text/x-moc"]="nvim.desktop"
+DEFAULTS_APPS["text/x-pascal"]="nvim.desktop"
+DEFAULTS_APPS["text/x-tcl"]="nvim.desktop"
+DEFAULTS_APPS["text/x-tex"]="nvim.desktop"
+DEFAULTS_APPS["application/x-shellscript"]="nvim.desktop"
+DEFAULTS_APPS["text/x-c"]="nvim.desktop"
+DEFAULTS_APPS["text/x-c++"]="nvim.desktop"
+# pdf reader
+DEFAULTS_APPS["application/pdf"]="pdf.desktop"
+# browser
+DEFAULTS_APPS["application/rdf+xml"]="browser.desktop"
+DEFAULTS_APPS["application/rss+xml"]="browser.desktop"
+DEFAULTS_APPS["application/xhtml+xml"]="browser.desktop"
+DEFAULTS_APPS["application/xhtml_xml"]="browser.desktop"
+DEFAULTS_APPS["application/xml"]="browser.desktop"
+DEFAULTS_APPS["text/html"]="browser.desktop"
+DEFAULTS_APPS["x-scheme-handler/http"]="browser.desktop"
+DEFAULTS_APPS["x-scheme-handler/https"]="browser.desktop"
+DEFAULTS_APPS["x-scheme-handler/ipfs"]="browser.desktop"
+DEFAULTS_APPS["x-scheme-handler/ipns"]="browser.desktop"
+# video player
+DEFAULTS_APPS["video/mp4"]="video.desktop"
+DEFAULTS_APPS["video/mpeg"]="video.desktop"
+DEFAULTS_APPS["video/quicktime"]="video.desktop"
+DEFAULTS_APPS["video/x-msvideo"]="video.desktop"
+DEFAULTS_APPS["video/x-ms-wmv"]="video.desktop"
+DEFAULTS_APPS["video/x-flv"]="video.desktop"
+DEFAULTS_APPS["video/webm"]="video.desktop"
+# torrent
+DEFAULTS_APPS["application/x-bittorrent"]="torrent.desktop"
+DEFAULTS_APPS["x-scheme-handler/magnet"]="torrent.desktop"
+
+function err_exit {
+    printf "%s: %s\n" "$PROG" "$*" >&2
+    exit 1
+}
+
+function logme {
+    printf "%s: %s\n" "$PROG" "$*"
+}
+
+function print_row {
+    if "$VERBOSE"; then
+        printf "| %-30s | %-20s | %-30s | %-20s \n" "$1" "$2" "$3" "$4"
+    fi
+}
+
+function get_current {
+    xdg-mime query default "$1"
+}
+
+function pline {
+    printf "%s\n" "|--------------------------------+----------------------+--------------------------------+-------|"
+}
+
+function print_header {
+    if "$VERBOSE"; then
+        print_row "MimeType" "Desktop Entry" "Current" "Status"
+        pline
+    fi
+}
+
+function is_set {
+    local mime_type="$1"
+    local desktop_entry current
+
+    desktop_entry="${DEFAULTS_APPS[$mime_type]}"
+    current=$(xdg-mime query default "$mime_type")
+
+    if [[ "$desktop_entry" != "$current" ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+function set_entry {
+    local mime_type="$1"
+    local entry="$2"
+    local entry_path="${ROOT}/${entry}"
+    if [[ ! -e "$entry_path" ]]; then
+        print_row "$mime_type" "$entry" "$(get_current "$key")" "${RED}ERR${RESET}"
+        return
+    fi
+
+    # xdg-mime default mailto.desktop x-scheme-handler/mailto
+    xdg-mime default "$entry" "$mime_type"
+    retcode=$?
+    if [[ "$retcode" -ne 0 ]]; then
+        logme "err setting '$entry' to '$mime_type"
+    else
+        print_row "$mime_type" "$entry" "$(get_current "$key")" "${BLUE}SET${RESET}"
+    fi
+}
+
+function check_entries {
+    if ! "$VERBOSE"; then
+        local mesg="checking mimetypes entries"
+        trap 'kill $! 2>/dev/null; echo; exit' SIGINT
+        printf "%s" "$mesg"
+        spinner "$mesg"
+    fi
+
+    print_header
+    local mime_type entry current
+    for mime_type in "${!DEFAULTS_APPS[@]}"; do
+        entry="${DEFAULTS_APPS[$mime_type]}"
+        current="$(get_current "$mime_type")"
+
+        if is_set "$mime_type"; then
+            print_row "$mime_type" "$entry" "$current" "${GREEN}OK${RESET}"
+        else
+            NOTSET["$mime_type"]="$entry"
+        fi
+    done
+
+    if ! "$VERBOSE"; then
+        kill $! 2>/dev/null
+    fi
+
+    # show unsetted entries
+    if [[ "${#NOTSET[@]}" -ne 0 ]]; then
+        echo
+        if ! "$VERBOSE"; then
+            printf "\r\033[K"
+            VERBOSE=true
+        fi
+        print_header
+
+        for key in "${!NOTSET[@]}"; do
+            print_row "$key" "${NOTSET[$key]}" "$(get_current "$key")" "${YELLOW}UNSET${RESET}"
+        done
+    else
+        if ! "$VERBOSE"; then
+            printf "\r\033[K"
+        fi
+        logme "all entries setted"
+    fi
+}
+
+function spinner {
+    local mesg="$1"
+    local i=0
+    while true; do
+        printf "."
+        i=$((i + 1))
+        if [[ $i -gt 3 ]]; then
+            i=0
+            printf "\r\033[K%s" "$mesg"
+        fi
+        sleep 0.4
+    done &
+}
+
+function update_entries {
+    local mesg="checking unsetted entries"
+    trap 'kill $! 2>/dev/null; echo; exit' SIGINT
+
+    printf "%s" "$mesg"
+    spinner "$mesg"
+    check_entries >/dev/null
+    kill $! 2>/dev/null
+    echo
+
+    if [[ "${#NOTSET[@]}" -eq 0 ]]; then
+        err_exit "nothing to set"
+    fi
+
+    echo
+    print_header
+    for key in "${!NOTSET[@]}"; do
+        set_entry "$key" "${NOTSET[$key]}"
+    done
+}
+
+function usage {
+    echo "Usage: $PROG [-v|--verbose] <COMMAND>
+
+    Set defaults mimetypes and desktop files
+
+Command:
+    -g, --get           show current desktop entry
+    -c, --check         show current state
+    -u, --update        set all desktop entries
+    -v, --verbose       verbose output"
+}
+
+function main {
+    if ! command -v xdg-mime >/dev/null; then
+        err_exit "xdg-mime not found"
+    fi
+
+    if [[ "${1-}" =~ ^-*v(erbose)?$ ]]; then
+        shift
+        VERBOSE=true
+    fi
+
+    case "$1" in
+    -c | check | --check) check_entries ;;
+    -g | get | --get) shift && get_current "$1" ;;
+    -u | update | --update) update_entries ;;
+    *) usage && exit ;;
+    esac
+}
+
+main "$@"
