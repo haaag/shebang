@@ -7,7 +7,8 @@
 - [`locker`](https://github.com/haaag/shebang/blob/main/locker) - simple locker with `xautolock` and `zzz`
 - [`passmenu`](https://github.com/haaag/shebang/blob/main/passmenu) - [`pass`](https://www.passwordstore.org/) helper
 - [`recipes`](https://github.com/haaag/shebang/blob/main/recipes) - open my recipes in zathura.
-- [`screenshot`](https://github.com/haaag/shebang/blob/main/screenshot) - takes `pretty` and `normal` screenshots
+- [`screenshot`](https://github.com/haaag/shebang/blob/main/screenshot) - `pretty` screenshots
+- [`set-mimetypes`](https://github.com/haaag/shebang/blob/main/set-mimetypes) - set apps for `xdg-open`
 - [`share-files`](https://github.com/haaag/shebang/blob/main/share-files) - simple file-selector and share with [`nnn`](https://github.com/jarun/nnn) and [`dragon-drop`](https://github.com/mwh/dragon)
 - [`suspend-hybrid`](https://github.com/haaag/shebang/blob/main/suspend-hybrid) - hibernate/suspend with `zzz/ZZZ`
 - [`sxhkd`](https://github.com/haaag/shebang/blob/main/sxhkd-help) - show `sxhkd` keybinds in `dmenu`
@@ -18,5 +19,4 @@
 
 ## 🚧 WIP
 
-- [`set-mimetypes`](https://github.com/haaag/shebang/blob/main/set-mimetypes) - set apps for `xdg-open`
 - [`vd`](https://github.com/haaag/shebang/blob/main/vd) - x binary package system [`xbps`](https://github.com/void-linux/xbps) helper -> [`voidlinux`](https://voidlinux.org/)
