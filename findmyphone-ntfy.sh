@@ -3,18 +3,23 @@
 PROG="${0##*/}"
 
 # shellcheck source=/dev/null
-[[ -f "$HOME/.dotfiles/private/env/ntfy.sh" ]] && . "$HOME/.dotfiles/private/env/ntfy.sh"
+[[ -f "${PRIVATE_ROOT:-}/ntfy.sh" ]] && . "$PRIVATE_ROOT/ntfy.sh"
+
+function send_notification {
+    local prog
+    local mesg="<b>$1</b>"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i "preferences-system-notifications" "$prog" "$mesg"
+}
 
 function log_err {
     local msg="$1"
-    notify-send "$PROG" "$msg"
+    send_notification "$msg"
     printf "%s: %s\n" "$PROG" "$msg" >&2
     exit 1
 }
 
-if [[ -z "$VOID_TOPIC" ]]; then
-    log_err "ntfy <topic> can not be empty"
-fi
+[[ -z "$VOID_TOPIC" ]] && log_err "ntfy <i>topic</i> can not be empty"
 
 notify-ntfy \
     --topic="${VOID_TOPIC}" \
