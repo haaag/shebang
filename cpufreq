@@ -4,13 +4,12 @@
 # ┃  ┣━┛┃ ┃┣╸ ┣┳┛┣╸ ┃┓┃
 # ┗━╸╹  ┗━┛╹  ╹┗╸┗━╸┗┻┛
 #
-# Utility designed to manage CPU frequency scaling
-#   - Displays available scaling modes
-#   - Displays current scaling governor
-#   - Sets the CPU scaling mode
+# manage CPU frequency scaling
+# * displays available scaling modes
+# * displays current scaling governor
+# * sets the cpu scaling mode
 #
-# Deps:
-#   - tlp-stat, notify-send, tput
+# deps: notify-send, tput
 
 set -o errexit
 set -o pipefail
@@ -53,7 +52,6 @@ $(help_modes)
 
 options:
     -s, --set           Set mode <MODE>
-    -S, --stats         Display stats
     -c, --current       Display current governor
     -m, --menu          Display governors to chose
     -h, --help          Display this help and exit
@@ -153,10 +151,6 @@ function mode_set {
     send_notification "setting profile: <i><b>$mode</b></i>" "$(get_notification_icon "$mode")"
 }
 
-function show_stats {
-    sudo tlp-stat -p
-}
-
 function show_current {
     logme "$CURRENT"
 }
@@ -198,18 +192,9 @@ function show_menu {
 }
 
 function main {
-    local arg="$1"
-
-    # for dep in "${DEPS[@]}"; do
-    #     if ! command -v "$dep" >/dev/null; then
-    #         log_err "$dep not found"
-    #     fi
-    # done
-
-    case "$arg" in
+    case "${1-}" in
     -s | *set) shift && mode_set "$@" ;;
     -c | *current) show_current ;;
-    -S | *stats) show_stats ;;
     -m | *menu) show_menu ;;
     *) usage ;;
     esac

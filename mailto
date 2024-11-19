@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# ┏┳┓┏━┓╻╻  ╺┳╸┏━┓
+# ┃┃┃┣━┫┃┃   ┃ ┃ ┃
+# ╹ ╹╹ ╹╹┗━╸ ╹ ┗━┛
+#
+# script to launch an email client (neomutt) with the selected account
+# configuration.
+
 PROG=$(basename "$0")
 SHELL=${SHELL:-$(which zsh)}
 TERMINAL=${TERMINAL:-st}
@@ -73,6 +80,7 @@ function dependencies {
 
 function main {
     dependencies
+
     local sendto="$1"
     local account_path=$MUTT/accounts
     if [[ ! -d "$account_path" ]]; then

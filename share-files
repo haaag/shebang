@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 
+# ┏━╸╻╻  ┏━╸┏━┓
+# ┣╸ ┃┃  ┣╸ ┗━┓
+# ╹  ╹┗━╸┗━╸┗━┛
 # simple file-selector and share with dragon-drop
 # deps: <nnn> <dragon-drop>
 
 PROG="${0##*/}"
-TMPFILE="/tmp/dragon.tmp"
+TMPFILE="$(mktemp -t "$PROG.XXXXXX")"
 DEPS=(nnn dragon-drop)
 
 # shellcheck source=/dev/null
@@ -27,8 +30,6 @@ function pre_exit {
     if [[ ! -f "$TMPFILE" ]]; then
         return
     fi
-
-    printf "%s: %s\n" "$PROG" "cleaning up..."
     rm "$TMPFILE" 2>/dev/null
 }
 
@@ -50,5 +51,5 @@ fi
 nnn -p "$TMPFILE"
 
 if [[ -f "$TMPFILE" ]]; then
-    setsid -f dragon-drop -x -I <"$TMPFILE"
+    setsid -f dragon-drop --and-exit --stdin --icon-only --on-top <"$TMPFILE"
 fi

@@ -203,12 +203,14 @@ function set_entry {
 
 function update_entries {
     print_header
+    local key
     for key in "${!NOTSET[@]}"; do
         set_entry "$key" "${NOTSET[$key]}"
     done
 }
 
 function handle_notset {
+    local key
     if ! "$VERBOSE"; then
         VERBOSE=true
         print_header

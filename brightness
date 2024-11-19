@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Script for managing brightness
+# script for managing brightness
 # dependency: brillo <https://gitlab.com/cameronnemo/brillo>
 
 PROG=$(basename "$0")

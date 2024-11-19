@@ -44,7 +44,7 @@ function get_icons {
     icons=(                 )
     icons+=(                )
     icons+=(          )
-    icons+=(         )
+    icons+=(            )
     icons+=(                    )
     icons+=(               )
     icons+=(              )
@@ -59,7 +59,7 @@ function is_bluetooth_on {
             return
         fi
 
-        printf "%s" ""
+        printf " %s" ""
         return
     fi
 }

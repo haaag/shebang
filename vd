@@ -76,6 +76,7 @@ function title {
 }
 
 function dependencies {
+    local cmd
     for cmd in "${DEPS[@]}"; do
         if ! command -v "$cmd" >/dev/null; then
             err_msg="'$cmd' command not found."
@@ -87,6 +88,7 @@ function dependencies {
 }
 
 function preview {
+    local i
     for i in "$@"; do
         version=${i##*-}
         pkg=${i%-*}

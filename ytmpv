@@ -36,6 +36,7 @@ function notify_and_exit {
 }
 
 function check_dependencies {
+    local cmd
     for cmd in "${DEPS[@]}"; do
         if ! command -v "$cmd" >/dev/null; then
             notify_and_exit "dependency '$cmd' not found"

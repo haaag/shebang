@@ -8,7 +8,7 @@
 
 PROG="${0##*/}"
 declare -a DEPS=(mpv pybrowsers tuiropen xclip ytmpv)
-declare -a OPTS=(browsers open copy mpv ytmpv img)
+declare -a OPTS=(open copy mpv ytmpv img browsers)
 
 function log_err {
     local msg="$1"

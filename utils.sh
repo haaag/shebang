@@ -57,9 +57,12 @@ function error {
 }
 
 function log_err {
-    local msg="$1"
-    printf "%s: %s\n" "$PROG" "$msg" >&2
+    printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
+}
+
+function _logme {
+    printf "%s: %s\n" "$PROG" "$1"
 }
 
 function err_and_exit {
@@ -169,6 +172,26 @@ function has {
             return 1
         fi
     done
+}
+
+function spinner {
+    local mesg="$1"
+    local i=0
+    while true; do
+        printf "."
+        i=$((i + 1))
+        if [[ $i -gt 3 ]]; then
+            i=0
+            printf "\r\033[K%s" "$mesg"
+        fi
+        sleep 0.4
+    done &
+
+    # Start signal handling to capture Ctrl+C
+    # trap 'kill $! 2>/dev/null; echo; exit' SIGINT
+
+    # kill spinner when primary function finish
+    # kill $! 2>/dev/null
 }
 
 # Only in ZSH

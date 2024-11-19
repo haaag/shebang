@@ -20,8 +20,8 @@ function usage {
 Usage: $PROG [options]
 
 Options:
-    -r, redshift   Toggle redshift
-    -d, dunst      Toggle dunst
+    -r, redshift   toggle redshift
+    -d, dunst      toggle dunst
 _EOF
     exit
 }
@@ -42,10 +42,12 @@ function logme {
 }
 
 function notify {
+    local prog
     local msg="$1"
     local icon="${2:-dialog-information}"
     local hints="string:x-canonical-private-synchronous:microphone"
-    dunstify -r "$NOTIFYID" -a "$PROG" -i "$icon" -t 3000 "$PROG" "$msg" -h "${hints}"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -r "$NOTIFYID" -a "$PROG" -i "$icon" -t 3000 "$prog" "$msg" -h "${hints}"
 }
 
 function toggle_redshift {

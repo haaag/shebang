@@ -43,7 +43,7 @@ function usage {
 
 simple locker with xautolock and zzz
 
-Usage: $PROG <timer in minutes> (default: 30m)
+Usage: $PROG <timer in minutes> (default: 30m | max: 60m)
 END
 }
 

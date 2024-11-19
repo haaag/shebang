@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# ┏━╸┏━┓┏━┓╻┏ ┏┓ ┏━┓┏━┓╻┏
-# ┃  ┃ ┃┃ ┃┣┻┓┣┻┓┃ ┃┃ ┃┣┻┓
-# ┗━╸┗━┛┗━┛╹ ╹┗━┛┗━┛┗━┛╹ ╹
+# ┏━┓┏━╸┏━╸╻┏━┓┏━╸┏━┓
+# ┣┳┛┣╸ ┃  ┃┣━┛┣╸ ┗━┓
+# ╹┗╸┗━╸┗━╸╹╹  ┗━╸┗━┛
 #
-# Script to open my recipes in zathura
+# script to open my recipes in zathura
 
 PROG=$(basename "$0")
 ROOT="${XDG_DOCUMENTS_DIR:-}/vimwiki/cookbook/"
@@ -105,7 +105,7 @@ _EOF
 }
 
 function main {
-    local recipe
+    local recipe cmd
     local arg="$1"
 
     for cmd in "${DEPS[@]}"; do
