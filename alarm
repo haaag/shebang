@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 
+# ┏━┓╻  ┏━┓┏━┓┏┳┓
+# ┣━┫┃  ┣━┫┣┳┛┃┃┃
+# ╹ ╹┗━╸╹ ╹╹┗╸╹ ╹
+# set alarm
+
 PROG="${0##*/}"
-ALARM="$HOME/bin/assets/alarm-beepbeep.mp3"
 DURATION="$1"
 MESG="${2:-Alarm}"
 ICON=""
-DEPS=(dunstify dmenu mpv)
+DEPS=(notify-send dmenu mpv)
 
 # files
+ALARM="$HOME/bin/assets/alarm-beepbeep.mp3"
 PIDFILE="/tmp/$PROG.pid"
 TIMEFILE="/tmp/$PROG.time"
 MPVPID="/tmp/$PROG.mpv"
 
-# TODO:
-# - [ ] Cant stop alarm with `alarm stop`
-# - [ ] Mpv process still running
+# TODO)):
+# - [ ] add support for multiple alarms (unique names)
 
 function log_err {
     local msg="$1"
@@ -23,8 +27,9 @@ function log_err {
 }
 
 function send_notification {
-    local icon="alarm-timer"
-    declare -a notify_args=(-r 888 --icon="$icon" "${PROG:-"no-name"}")
+    declare -a notify_args=(-r 888 --icon="alarm-timer")
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify_args+=("$prog")
     notify-send "${notify_args[@]}" "$*"
 }
 
@@ -37,7 +42,7 @@ function check_deps {
         fi
     done
 
-    if [[ ! -f "$ALARM" ]]; then
+    if [[ ! -e "$ALARM" ]]; then
         err_msg="alarm file not found: $ALARM"
         send_notification "$err_msg"
         log_err "$err_msg"
@@ -50,24 +55,56 @@ function pre_exit {
     rm -f "$TIMEFILE"
     rm -f "$PIDFILE"
     rm -f "$MPVPID"
-    send_notification "alarm with duration $DURATION finished"
+    send_notification "alarm finished"
     exit 0
 }
 
 function usage {
-    echo "Usage: $PROG <duration> [<name>]"
+    cat <<-EOF
+Usage: $PROG [[+|-<duration>]]
+
+    Sets a simple alarm
+
+Options:
+    status          Show current status
+    cancel, stop    Remove current alarm
+EOF
+}
+
+function interpret_time {
+    local input last_char time
+    if [[ ${#1} -eq 1 ]]; then
+        input="${1}m"
+    else
+        input="$1"
+    fi
+
+    last_char="${input: -1}"
+    time="${input:0:-1}"
+
+    if [[ "$last_char" == "m" ]]; then
+        time=$((time * 60))
+    elif [[ "$last_char" == "s" ]]; then
+        time=$((time))
+    elif [[ "$last_char" == "h" ]]; then
+        time=$((time * 60 * 60))
+    else
+        exit 130
+    fi
+
+    echo "$time"
 }
 
 function cancel_timer {
     local pid
 
-    if [[ -f "$MPVPID" ]]; then
+    if [[ -e "$MPVPID" ]]; then
         local mpvpid
         mpvpid=$(cat "$MPVPID")
         kill -9 "$mpvpid" &>/dev/null
     fi
 
-    if [[ ! -f "$PIDFILE" ]]; then
+    if [[ ! -e "$PIDFILE" ]]; then
         return
     fi
 
@@ -89,6 +126,23 @@ function save_timestamp {
 
 function get_timestamp {
     cat "$TIMEFILE"
+}
+
+function update_timestamp {
+    echo "${1:-0}" | tee "$TIMEFILE" >/dev/null
+}
+
+function update_time {
+    local time new_time current
+    if [[ ! -e "$TIMEFILE" ]]; then
+        err_msg="no alarm found"
+        send_notification "$err_msg"
+        log_err "$err_msg"
+    fi
+    time=$(interpret_time "${1:-0}")
+    current=$(get_timestamp)
+    new_time=$((current + time))
+    update_timestamp "$new_time"
 }
 
 function show_status {
@@ -126,40 +180,15 @@ function show_status {
     echo "$ICON $result"
 }
 
-function interpret_time {
-    local input last_char time
-    if [[ ${#1} -eq 1 ]]; then
-        input="${1}m"
-    else
-        input="$1"
-    fi
-
-    last_char="${input: -1}"
-    time="${input:0:-1}"
-
-    if [[ "$last_char" == "m" ]]; then
-        time=$((time * 60))
-    elif [[ "$last_char" == "s" ]]; then
-        time=$((time))
-    elif [[ "$last_char" == "h" ]]; then
-        time=$((time * 60 * 60))
-    else
-        exit 130
-    fi
-
-    echo "$time"
-}
-
 function sound_the_alarm {
     send_notification "alarm with duration=$duration"
     mpv "$ALARM" --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
     mpv_pid=$!
-    echo "mpv_pid:::$mpv_pid"
     echo "$mpv_pid" >"$MPVPID"
 }
 
 function set_alarm {
-    trap pre_exit EXIT SIGTERM
+    trap pre_exit SIGTERM
 
     local duration current current_time
     duration="$1"
@@ -193,28 +222,43 @@ function get_duration {
 function main {
     check_deps
 
-    if [[ "${1-}" == "status" ]]; then
-        show_status
-        exit
-    fi
+    local pid
 
-    if [[ "${1-}" =~ ^(cancel|stop|kill)$ ]]; then
-        cancel_timer
-        exit 0
-    fi
-
-    if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+    case "${1-}" in
+    -h | --help)
         usage
         exit 1
-    fi
+        ;;
+    +*)
+        update_time "$@"
+        exit 0
+        ;;
+    -*)
+        update_time "$@"
+        exit 0
+        ;;
+    "status")
+        show_status
+        exit
+        ;;
+    cancel | stop | kill)
+        cancel_timer
+        exit 0
+        ;;
+    help)
+        usage
+        exit 1
+        ;;
+    *) ;;
+    esac
 
     if [[ -z "$DURATION" ]]; then
         DURATION=$(get_duration)
     fi
 
-    [[ -z "$DURATION" ]] && exit
+    [[ -z "$DURATION" ]] && exit 1
 
-    if [[ $DURATION =~ ^(cancel|stop|kill)$ ]]; then
+    if [[ "$DURATION" =~ ^(cancel|stop|kill)$ ]]; then
         cancel_timer
     fi
 
