@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+# ╻ ╻┏━┓╻  ┏━┓
+# ┃ ┃┣┳┛┃  ┗━┓
+# ┗━┛╹┗╸┗━╸┗━┛
+# share urls with ntfy
+# deps: <curl> <perl> <notify-send> <dmenu>
+
+PROG="${0##*/}"
+DEPS=(curl perl notify-send)
+
+# shellcheck source=/dev/null
+[[ -f "${PRIVATE_ROOT:-}/ntfy.sh" ]] && . "$PRIVATE_ROOT/ntfy.sh"
+
+function _notify {
+    local prog
+    local mesg="<b>$1</b>"
+    local icon="${2:-dialog-warning}"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i "$icon" "$prog" "$mesg"
+}
+
+function _logerr {
+    printf "%s: %s\n" "$PROG" "$1" >&2
+    exit 1
+}
+
+function _logme {
+    printf "%s: %s\n" "$PROG" "$1"
+}
+
+function _is_url_valid {
+    if ! curl -sL -I "$url" >/dev/null 2>&1; then
+        return 1
+    fi
+
+    return 0
+}
+
+function _get_video_title {
+    local url="$1"
+    local title _default_title
+    _default_title="$url"
+
+    if ! _is_url_valid "$url"; then
+        echo "$_default_title"
+        return
+    fi
+
+    title=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
+    [[ -z "$title" ]] && title="$_default_title"
+
+    echo "$title"
+}
+
+function has {
+    local verbose=false
+    local c
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "$c not found"
+            return 1
+        fi
+    done
+}
+
+function _url_input {
+    local url
+    local cmd="dmenu"
+
+    if ! has -v "$cmd"; then
+        exit 1
+    fi
+
+    local icon=""
+    url=$(: | $cmd -i -p "$icon URL:")
+    echo "$url"
+}
+
+has -v "${DEPS[@]}"
+
+# assert ntfy <topic>
+[[ -z "$LINKS_TOPIC" ]] && _logerr "must provide TOPIC"
+
+function main {
+    local url="$1"
+    # check clipboad
+    [[ -z "$url" ]] && url=$(xclip -o -sel clip)
+
+    if ! _is_url_valid "$url"; then
+        # prompt dmenu for URL
+        url=$(_url_input)
+    fi
+
+    [[ -z "$url" ]] && _logerr "must provide URL"
+    title=$(_get_video_title "$url")
+
+    _notify "$title" "gnome-user-share"
+
+    curl \
+        -H "Title: $title" \
+        -H "Priority: default" \
+        -H "Tags: link" \
+        -d "$url" \
+        ntfy.sh/"$LINKS_TOPIC" >/dev/null 2>&1
+}
+
+main "$@"
