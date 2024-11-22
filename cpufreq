@@ -7,9 +7,9 @@
 # manage CPU frequency scaling
 # * displays available scaling modes
 # * displays current scaling governor
-# * sets the cpu scaling mode
 #
-# deps: notify-send, tput
+# deps: <notify-send>
+# deps optional: <yad>
 
 set -o errexit
 set -o pipefail
@@ -45,7 +45,7 @@ function usage {
     cat <<-_EOF
 usage: $PROG [OPTIONS]
 
-    Set CPU Frequencies
+    Sets the cpu scaling mode
 
 available:
 $(help_modes)
@@ -54,6 +54,7 @@ options:
     -s, --set           Set mode <MODE>
     -c, --current       Display current governor
     -m, --menu          Display governors to chose
+    -d, --dialog        Display a dialog to chose from
     -h, --help          Display this help and exit
 _EOF
 }
@@ -64,8 +65,19 @@ function log_err {
     exit 1
 }
 
+function logme {
+    local msg="$1"
+    local color="${2:-$BLUE}"
+    printf "%s: %b%s%b\n" "$PROG" "$color" "$msg" "$RESET"
+}
+
 function send_notification {
     if [[ -z "$DISPLAY" ]]; then
+        return
+    fi
+
+    if ! command -v notify-send >/dev/null; then
+        logme "'notify-send' not found"
         return
     fi
 
@@ -88,15 +100,9 @@ function get_notification_icon {
     return
 }
 
-function logme {
-    local msg="$1"
-    local color="${2:-$BLUE}"
-    printf "%s: %b%s%b\n" "$PROG" "$color" "$msg" "$RESET"
-}
-
 function mode_available {
     local mode="$1"
-    local scaling_available
+    local scaling_available available
     IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
 
     for available in "${scaling_available[@]}"; do
@@ -191,11 +197,29 @@ function show_menu {
     done
 }
 
+function show_dialog {
+    local scaling_available selection
+    declare -a yad_args=(--title="Select Mode" --list --column="Mode")
+    IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
+
+    if ! command -v yad >/dev/null; then
+        log_err "'yad' not found"
+    fi
+
+    selection=$(yad "${yad_args[@]}" "${scaling_available[@]}" 2>/dev/null)
+
+    [[ -z "$selection" ]] && log_err "action aborted"
+    selection=${selection%?}
+
+    mode_set "$selection"
+}
+
 function main {
     case "${1-}" in
     -s | *set) shift && mode_set "$@" ;;
     -c | *current) show_current ;;
     -m | *menu) show_menu ;;
+    -d | *dialog) show_dialog ;;
     *) usage ;;
     esac
 
