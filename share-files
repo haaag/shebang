@@ -6,6 +6,10 @@
 # simple file-selector and share with dragon-drop
 # deps: <nnn> <dragon-drop>
 
+set -o nounset
+set -o errexit
+set -o pipefail
+
 PROG="${0##*/}"
 TMPFILE="$(mktemp -t "$PROG.XXXXXX")"
 DEPS=(nnn dragon-drop)
@@ -43,7 +47,7 @@ done
 
 trap pre_exit EXIT SIGTERM
 
-if [[ -n "$1" ]]; then
+if [[ -n "${1:-}" ]]; then
     setsid -f dragon-drop -x "$1"
     exit 0
 fi
@@ -51,5 +55,5 @@ fi
 nnn -p "$TMPFILE"
 
 if [[ -f "$TMPFILE" ]]; then
-    setsid -f dragon-drop --and-exit --stdin --icon-only --on-top <"$TMPFILE"
+    setsid -f dragon-drop --and-exit --stdin --on-top <"$TMPFILE"
 fi

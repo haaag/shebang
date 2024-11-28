@@ -6,6 +6,10 @@
 # share urls with ntfy
 # deps: <curl> <perl> <notify-send> <dmenu>
 
+set -o errexit
+set -o pipefail
+set -o nounset
+
 PROG="${0##*/}"
 DEPS=(curl perl notify-send)
 
@@ -88,8 +92,8 @@ has -v "${DEPS[@]}"
 [[ -z "$LINKS_TOPIC" ]] && _logerr "must provide TOPIC"
 
 function main {
-    local url="$1"
-    # check clipboad
+    local url="${1-}"
+    # check clipboard
     [[ -z "$url" ]] && url=$(xclip -o -sel clip)
 
     if ! _is_url_valid "$url"; then

@@ -4,6 +4,9 @@
 # ┃  ┃ ┃┃╺┓┗━┓
 # ┗━╸┗━┛┗━┛┗━┛
 
+set -o nounset
+set -o pipefail
+
 PROG=$(basename "$0")
 LOGS_PATH=${LOGS_PATH:-$HOME/dcs/log}
 TERMINAL=${TERMINAL:-st}

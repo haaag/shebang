@@ -6,6 +6,21 @@
 PROG="${0##*/}"
 [[ -v debug ]] && set -x
 
+# flags
+# set -o allexport (set -a)  # automatically export all variables
+# set -o errexit (set -e)    # exit the script if a command fails
+# set -o errtrace            # allow the `-e` option to apply to functions and subshells
+# set -o ignoreeof           # prevent the shell from exiting on receiving EOF (Ctrl+D)
+# set -o noclobber           # prevent overwriting files with redirection
+# set -o noglob              # disable pathname expansion (glob)
+# set -o nounset (set -u)    # exit the script if an undefined variable is used
+# set -o pipefail            # return the exit status of the last command in a pipeline that failed
+# set -o posix               # enable POSIX-compliant mode for more strict behavior
+# set -o vi                  # enable vi editing mode for the command line
+# set -o emacs               # enable emacs editing mode for the command line (default mode)
+# set -o xtrace (set -x)     # print each command before executing it (for debugging)
+# set -o verbose (set -v)    # print each line of the script as it is read
+
 # SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 # SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 # DIR=${0%/*}
@@ -14,8 +29,8 @@ PROG="${0##*/}"
 # PROG="$(basename "$0")"
 # with symlink
 # echo "Specials: !=$!, -=$-, _=$_. ?=$?, #=$# *=$* @=$@ \$=$$ …"
-#
-# SIGNALS
+
+# signals
 # Disable CTRL-Z because if we allowed this key press,
 # then the script would exit but, nsxiv would still be
 # running

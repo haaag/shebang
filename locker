@@ -5,6 +5,10 @@
 # ┗━╸┗━┛┗━╸╹ ╹┗━╸╹┗╸
 # simple locker with xautolock and zzz
 
+set -o errexit
+set -o pipefail
+set -o nounset
+
 PROG=$(basename "$0")
 DEPS=(xautolock zzz setsid)
 SUSPEND_TIME=30
@@ -49,7 +53,7 @@ END
 
 function main {
     local timer dep
-    timer="$1"
+    timer="${1:-}"
 
     for dep in "${DEPS[@]}"; do
         if ! command -v "$dep" >/dev/null; then
