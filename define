@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+# ╺┳┓┏━╸┏━╸╻┏┓╻┏━╸
+#  ┃┃┣╸ ┣╸ ┃┃┗┫┣╸
+# ╺┻┛┗━╸╹  ╹╹ ╹┗━╸
+# simple terminal scratchpad for define words from
+# clipboard
+# engine: https://github.com/soimort/translate-shell
+
+set -eou pipefail
+
+PROG="${0##*/}"
+DEPS=(trans xclip nvim)
+
+function _logerr {
+    printf "%s: %s\n" "$PROG" "$*"
+    read -p "Press ENTER to continue..." -r _
+    exit 1
+}
+
+function _get_clipboard {
+    local clipboard
+    clipboard=$(xclip -selection c -o 2>/dev/null)
+    echo "${clipboard}"
+}
+
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" >/dev/null; then
+        _logerr "'$dep' dependency not found"
+    fi
+done
+
+function main {
+    local data word_count
+    local lang="${1:-en:}"
+    data=$(_get_clipboard)
+    word_count=$(echo "$data" | wc -w)
+
+    if [[ "${word_count}" -eq 0 ]]; then
+        _logerr "no words detected"
+    fi
+
+    if [[ "${word_count}" -ne 1 ]]; then
+        _logerr "multiple words detected: '$data'"
+    fi
+
+    trans -dictionary "${lang}" "${data}" -v -pager="nvim +Man\!"
+}
+
+main "$@"

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# ╺┳╸┏━┓┏━┓┏┓╻┏━┓╻  ┏━┓╺┳╸┏━╸
+#  ┃ ┣┳┛┣━┫┃┗┫┗━┓┃  ┣━┫ ┃ ┣╸
+#  ╹ ╹┗╸╹ ╹╹ ╹┗━┛┗━╸╹ ╹ ╹ ┗━╸
+# simple terminal scratchpad for translation sentences from
+# clipboard
+# default language: spanish
+# engine: https://github.com/soimort/translate-shell
+
+set -eou pipefail
+
+PROG=$(basename "$0")
+DEPS=(trans xclip nvim)
+
+function _logerr {
+    printf "%s: %s\n" "$PROG" "$*"
+    read -p "Press ENTER to continue..." -r _
+    exit 1
+}
+
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" >/dev/null; then
+        _logerr "'$dep' dependency not found"
+    fi
+done
+
+function _get_clipboard {
+    local clipboard
+    clipboard=$(xclip -selection c -o 2>/dev/null)
+    echo "${clipboard}"
+}
+
+function main {
+    local lang=${1:-'es:en'}
+    local text=${2:-$(_get_clipboard)}
+    trans "${lang}" "${text:-'clipboard empty'}" -v -pager="nvim +Man\!"
+}
+
+main "$@"
