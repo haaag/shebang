@@ -15,6 +15,7 @@
 - [`suspend-hybrid`](https://github.com/haaag/shebang/blob/main/suspend-hybrid) - hibernate/suspend with `zzz/ZZZ` <small>_(dep: [`hibernate-loop`](https://github.com/haaag/shebang/blob/main/hibernate-loop))_</small>
 - [`sxhkd`](https://github.com/haaag/shebang/blob/main/sxhkd-help) - show `sxhkd` keybinds in `dmenu`
 - [`translate`](https://github.com/haaag/shebang/blob/main/translate) - translate `text` using [`trans`](https://github.com/soimort/translate-shell)
+- [`manpdf`](https://github.com/haaag/shebang/blob/main/manpdf) - use pdf reader to view man pages
 - [`utils.sh`](https://github.com/haaag/shebang/blob/main/utils.sh) - good functions found out there
 - [`wmprompt`](https://github.com/haaag/shebang/blob/main/wmprompt) - suckless system prompt
 - [`ytchannelid`](https://github.com/haaag/shebang/blob/main/ytchannelid) - extracts the `YTchannelID` from a given `URL` <small>(for newsboat)</small>

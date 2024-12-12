@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+# ┏┳┓┏━┓┏┓╻┏━┓╺┳┓┏━╸
+# ┃┃┃┣━┫┃┗┫┣━┛ ┃┃┣╸
+# ╹ ╹╹ ╹╹ ╹╹  ╺┻┛╹
+# use pdf reader to view man pages
+
+set -eou pipefail
+
+PROG=${0##*/}
+DEPS=(fzf dmenu)
+READER=${READER:-}
+PROMPT=" manual> "
+MENU=
+declare -a args=()
+
+function _logerr {
+    printf "%s: %s\n" "$PROG" "$1" >&2
+    exit 1
+}
+
+function _has {
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "'$c' not found"
+            return 1
+        fi
+    done
+}
+
+function _in_terminal {
+    if [[ -t 0 ]]; then
+        return 0
+    fi
+    return 1
+}
+
+[[ -z "$READER" ]] && _logerr "reader not set"
+
+_has -v "${DEPS[@]}"
+
+if _in_terminal; then
+    MENU="fzf"
+    args+=(--no-preview --prompt="$PROMPT" --cycle)
+else
+    MENU="dmenu"
+    args+=(-l 10 -p "$PROMPT" -i)
+fi
+
+[[ -z "$MENU" ]] && _logerr "menu not set"
+
+selected=$(man -k . | awk '{ print $1 " " $2 }' | "$MENU" "${args[@]}")
+
+[[ -z "$selected" ]] && exit 0
+
+echo "$selected" |
+    sed 's/(\([0-9]\+\))//g' |
+    xargs man -T pdf 2>/dev/null |
+    ps2pdf - - |
+    "${READER:-}" - >/dev/null 2>&1
