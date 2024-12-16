@@ -3,24 +3,18 @@
 # ┏━╸┏━┓╻ ╻┏━╸┏━┓┏━╸┏━┓
 # ┃  ┣━┛┃ ┃┣╸ ┣┳┛┣╸ ┃┓┃
 # ┗━╸╹  ┗━┛╹  ╹┗╸┗━╸┗┻┛
-#
 # manage CPU frequency scaling
 # * displays available scaling modes
 # * displays current scaling governor
-#
-# deps: <notify-send>
-# deps optional: <yad>
+# * set scaling governor with menu
+# deps: <sudo>
 
-set -o errexit
-set -o pipefail
+set -eou pipefail
 
 PROG=$(basename "$0")
 AVAILABLE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
 CURRENT=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 GOVERNOR=(/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor)
-
-# notification
-DISPLAY=${DISPLAY:-:0}
 
 # always ask password
 sudo --askpass --reset-timestamp
@@ -33,7 +27,34 @@ BOLD=$(tput bold)
 WHITE=$(tput setaf 7)
 RESET="$(tput sgr0)"
 
-function help_modes {
+function _logerr {
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
+}
+
+function _logme {
+    local msg="$1"
+    local color="${2:-$BLUE}"
+    printf "%s: %b%s%b\n" "$PROG" "$color" "$msg" "$RESET"
+}
+
+function _has {
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logme "'$c' dependency not found"
+            return 1
+        fi
+    done
+}
+
+function _help_modes {
     local scaling_available
     IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
     for available in "${scaling_available[@]}"; do
@@ -41,55 +62,23 @@ function help_modes {
     done
 }
 
-function usage {
-    cat <<-_EOF
-usage: $PROG [OPTIONS]
-
-    Sets the cpu scaling mode
-
-available:
-$(help_modes)
-
-options:
-    -s, --set           Set mode <MODE>
-    -c, --current       Display current governor
-    -m, --menu          Display governors to chose
-    -d, --dialog        Display a dialog to chose from
-    -h, --help          Display this help and exit
-_EOF
-}
-
-function log_err {
-    local msg="$1"
-    printf "%s: %s\n" "$PROG" "$msg" >&2
-    exit 1
-}
-
-function logme {
-    local msg="$1"
-    local color="${2:-$BLUE}"
-    printf "%s: %b%s%b\n" "$PROG" "$color" "$msg" "$RESET"
-}
-
-function send_notification {
+function _notifyme {
     if [[ -z "$DISPLAY" ]]; then
+        _logme "no display found"
         return
     fi
 
-    if ! command -v notify-send >/dev/null; then
-        logme "'notify-send' not found"
-        return
-    fi
+    _has -v "notify-send" || exit 1
 
     local prog
     local mesg="<b>$1</b>"
-    local icon="${2:-dialog-warning}"
+    local icon="${2:-cpu}"
     local hints="string:x-canonical-private-synchronous:cpufreq"
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
     notify-send -r 666 -a "$PROG" -i "$icon" "$prog" "$mesg" -h "$hints"
 }
 
-function get_notification_icon {
+function _get_notify_icon {
     local mode="$1"
     if [[ "$mode" = "performance" ]]; then
         echo "power-profile-performance-symbolic"
@@ -100,81 +89,81 @@ function get_notification_icon {
     return
 }
 
-function mode_available {
+function _mode_available {
     local mode="$1"
     local scaling_available available
     IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
 
     for available in "${scaling_available[@]}"; do
         if [[ "$mode" == "$available" ]]; then
-            logme "mode '${mode}' is available" "$MAGENTA"
+            _logme "mode '${mode}' is available" "$MAGENTA"
             return 0
         fi
     done
 
-    logme "mode '$mode' not available" "$RED"
+    _logme "mode '$mode' not available" "$RED"
     mode_list
 
     return 1
 }
 
-function mode_list {
+function _mode_list {
     local scaling_available
     IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
-    logme "available modes"
+    _logme "available modes"
     for available in "${scaling_available[@]}"; do
         printf "  - %b%s%b\n" "$MAGENTA" "$available" "$RESET"
     done
 }
 
-function mode_check {
+function _mode_check {
     local mode="$1"
 
-    [[ -z "$mode" ]] && logme "err mode not found" "$RED" && exit 130
+    [[ -z "$mode" ]] && _logme "err mode not found" "$RED" && exit 130
 
-    if ! mode_available "$mode"; then
+    if ! _mode_available "$mode"; then
         return 1
     fi
 
     return 0
 }
 
-function mode_set {
+function _mode_set {
     local mode="$1"
 
-    if ! mode_check "$mode"; then
+    if ! _mode_check "$mode"; then
         return 1
     fi
 
     if [[ "$mode" = "$CURRENT" ]]; then
-        logme "already in profile: $mode"
-        send_notification "current: <i>$mode</i>" "$(get_notification_icon "$mode")"
+        _logme "already in profile: $mode"
+        _notifyme "current: <i>$mode</i>" "$(_get_notify_icon "$mode")"
         return
     fi
 
-    logme "setting to '$mode' mode" "$BLUE"
+    _logme "setting to '$mode' mode" "$BLUE"
     echo "$mode" | sudo -p "[sudo] setting to '$mode'  : " tee "${GOVERNOR[@]}" >/dev/null
-    send_notification "setting profile: <i><b>$mode</b></i>" "$(get_notification_icon "$mode")"
+    _notifyme "setting profile: <i><b>$mode</b></i>" "$(_get_notify_icon "$mode")"
 }
 
-function show_current {
-    logme "$CURRENT"
+function _current {
+    _logme "$CURRENT"
 }
 
-function prompt {
+function _prompt {
     local color="$1"
     local mesg="$2"
     echo -ne "${color}${BOLD}${mesg}${RESET}"
 }
 
-function show_menu {
+function _menu {
     local governors
     IFS=" " read -r -a governors <<<"$(cat "$AVAILABLE")"
 
     while true; do
         count=1
 
-        prompt "${WHITE}" "select mode:\n"
+        _prompt "${WHITE}" "select mode:\n"
         echo
         # show options
         for gov in "${governors[@]}"; do
@@ -182,13 +171,13 @@ function show_menu {
             count=$((count + 1))
         done
 
-        prompt "${BLUE}" "\nenter choice: "
+        _prompt "${BLUE}" "\nenter choice: "
         read -r CHOSEN
 
         # set mode
         case "$CHOSEN" in
         [1-9] | [1-9][0-9] | [1-9][0-9][0-9])
-            mode_set "${governors[$((CHOSEN - 1))]}"
+            _mode_set "${governors[$((CHOSEN - 1))]}"
             break
             ;;
         *) ;;
@@ -197,29 +186,50 @@ function show_menu {
     done
 }
 
-function show_dialog {
+function _dialog {
     local scaling_available selection
-    declare -a yad_args=(--title="Select Mode" --list --column="Mode")
+
+    _has -v dmenu || {
+        _notifyme "'dmenu' not found"
+        exit 1
+    }
+
     IFS=" " read -r -a scaling_available <<<"$(cat "$AVAILABLE")"
 
-    if ! command -v yad >/dev/null; then
-        log_err "'yad' not found"
-    fi
+    selection=$(printf "%s\n" "${scaling_available[@]}" | dmenu -sb '#83a598' -i -p " mode>")
+    [[ -z "$selection" ]] && _logerr "action aborted"
+    _mode_set "$selection"
+}
 
-    selection=$(yad "${yad_args[@]}" "${scaling_available[@]}" 2>/dev/null)
+function usage {
+    cat <<-_EOF
+usage: $PROG [OPTIONS]
 
-    [[ -z "$selection" ]] && log_err "action aborted"
-    selection=${selection%?}
+    Sets the cpu scaling mode
 
-    mode_set "$selection"
+available:
+$(_help_modes)
+
+options:
+    -s, --set           Set mode <MODE>
+    -c, --current       Display current governor
+    -m, --menu          Display governors to chose
+    -d, --dialog        Display a dialog to chose from
+    -h, --help          Display this help and exit
+_EOF
 }
 
 function main {
+    [[ ! -f "$AVAILABLE" ]] && {
+        _logme "no available governors" "$RED"
+        _logerr "'$AVAILABLE' not found"
+    }
+
     case "${1-}" in
-    -s | *set) shift && mode_set "$@" ;;
-    -c | *current) show_current ;;
-    -m | *menu) show_menu ;;
-    -d | *dialog) show_dialog ;;
+    -s | *set) shift && _mode_set "$@" ;;
+    -c | *current) _current ;;
+    -m | *menu) _menu ;;
+    -d | *dialog) _dialog ;;
     *) usage ;;
     esac
 
