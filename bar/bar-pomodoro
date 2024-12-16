@@ -4,11 +4,11 @@
 #
 # Output: [ICON time]
 
-PROG=$(basename "$0")
-CMD="alarm"
+PROG="${0##*/}"
+CMD=timer
 
 if ! command -v "$CMD" >/dev/null; then
-    printf "%s: %s\n" "$PROG" "$CMD not found"
+    printf "%s: %s\n" "$PROG" "err: $CMD not found"
     exit 1
 fi
 

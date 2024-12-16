@@ -6,7 +6,7 @@
 # Output: [UNICODE 98% status]
 
 BAT_CHARGE=$(cat /sys/class/power_supply/BAT0/capacity)
-CRITICAL=15
+CRITICAL=10
 
 # notification icons
 warn="🔴"

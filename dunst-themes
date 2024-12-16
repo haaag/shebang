@@ -67,7 +67,7 @@ function _has {
     for c in "$@"; do
         c="${c%% *}"
         if ! command -v "$c" &>/dev/null; then
-            [[ "$verbose" == true ]] && _logme "'$c' not found"
+            [[ "$verbose" == true ]] && _logerr "'$c' not found"
             return 1
         fi
     done
@@ -184,7 +184,7 @@ function main {
     local opt="${1:-}"
     local theme="${2:-}"
 
-    _has -v "${DEPS[@]}" || exit 1
+    _has -v "${DEPS[@]}"
 
     # exit if defaults not found
     if [[ ! -f "$DEFAULTS" ]]; then

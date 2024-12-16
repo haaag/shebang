@@ -1,13 +1,14 @@
 #!/bin/sh
 
-# Script for displaying date in dwm bar.
+# ╺┳┓┏━┓╺┳╸┏━╸
+#  ┃┃┣━┫ ┃ ┣╸
+# ╺┻┛╹ ╹ ╹ ┗━╸
+# formatted date.
 #
-# Output: "[ICON Fri DD-MM]"
+# output: "[ICON Fri, DD MMM]"
 #      
 ICON=" "
 
-DATE=$(date "+%a %d-%m")
+# fmt_date="$(date "+%a %d-%m")"
 
-printf "%s" "${SEP1:-}"
-printf "%s %s" "$ICON" "$DATE"
-printf "%s\n" "${SEP2:-}"
+printf "%s%s %s%s\n" "${SEP:-}" "$ICON" "$(date "+%a %d %b")" "${SEP:-}"

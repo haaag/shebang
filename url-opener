@@ -1,68 +1,121 @@
 #!/usr/bin/env bash
 
-# ╻ ╻┏━┓╻
-# ┃ ┃┣┳┛┃
-# ┗━┛╹┗╸┗━╸
-#
-# Simple script to open URLs with different programs
+# ╻ ╻┏━┓╻     ┏━┓┏━┓┏━╸┏┓╻┏━╸┏━┓
+# ┃ ┃┣┳┛┃  ╺━╸┃ ┃┣━┛┣╸ ┃┗┫┣╸ ┣┳┛
+# ┗━┛╹┗╸┗━╸   ┗━┛╹  ┗━╸╹ ╹┗━╸╹┗╸
+# simple script to open urls with different programs
 
 PROG="${0##*/}"
-declare -a DEPS=(mpv pybrowsers tuiropen xclip ytmpv)
+DIR="/tmp/$PROG"
 declare -a OPTS=(open copy mpv ytmpv img browsers)
 
-function log_err {
+set -eou pipefail
+
+function _notifyme {
+    local prog
+    local mesg="<b>$1</b>"
+    local icon="${2:-dialog-warning}"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i "$icon" "$prog" "$mesg"
+}
+
+function _logerr {
     local msg="$1"
     printf "%s: %s\n" "$PROG" "$msg" >&2
+    _notifyme "$msg"
     exit 1
 }
 
-for dep in "${DEPS[@]}"; do
-    if ! command -v "$dep" >/dev/null; then
-        log_err "'$dep' command not found."
+function _has {
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
     fi
-done
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "'$c' not found"
+            return 1
+        fi
+    done
+}
 
-function mympv {
-    socket="${MPVSOCKET:-/tmp/mpvsocket}"
+function _cleanup {
+    local count
+    _has -v find
+    count=$(find "$DIR" -maxdepth 1 -type f | wc -l)
+    if [[ $count -gt 10 ]]; then
+        rm -rf "$DIR"
+    fi
+}
+
+function _mpv {
+    _has -v mpv
+    local socket="${MPVSOCKET:-/tmp/mpvsocket}"
     setsid -f mpv --input-ipc-server="$socket" -quiet --loop "$1" >/dev/null 2>&1 &
 }
 
-function open_ytmpv {
+function _open_ytmpv {
+    _has -v ytmpv
     local url
     url=$(xclip -selection clipboard -o)
     ytmpv "$url"
 }
 
-function choose_action {
+function _choose_action {
     local arg="$1"
+    local _action
 
-    CHOSEN=$(printf "%s\n" "${OPTS[@]}" | dmenu -h 20 -i -p "openWith>")
-    [[ -z $CHOSEN ]] && exit
+    _action=$(printf "%s\n" "${OPTS[@]}" | dmenu -h 20 -i -p "openWith>")
+    [[ -z $_action ]] && exit 1
 
-    case "$CHOSEN" in
+    case "$_action" in
     open) setsid -f xdg-open "$arg" ;;
-    browsers) setsid -f pybrowsers --verbose --url "$arg" ;;
-    copy) echo -e "$arg" | xclip -selection clipboard -r ;;
-    mpv) mympv "$arg" & ;;
-    ytmpv) open_ytmpv "$arg" ;;
+    browsers) _has -v pybrowsers && setsid -f pybrowsers --verbose --url "$arg" ;;
+    copy) _has -v xclip && echo -e "$arg" | xclip -selection clipboard -r ;;
+    mpv) _mpv "$arg" & ;;
+    ytmpv) _open_ytmpv "$arg" ;;
     img) tuiropen "$arg" & ;;
-    *) exit ;;
+    *) exit 1 ;;
     esac
 
     exit 0
 }
 
 function main {
-    local arg="$1"
-    [[ -z $arg ]] && {
-        echo "Usage: $PROG <url>"
+    [[ -z ${1:-} ]] && {
+        echo "Usage: $PROG <URL>"
         exit 1
     }
 
-    case "$arg" in
-    *preview.redd.it* | *v.redd.it* | *i.imgur.com* | *reddit.com/gallery* | *png* | *gif* | *jpeg* | *jpg*) setsid -f tuiropen "$arg" ;;
-    *youtu.be* | *youtube.com/watch* | *youtube.com/playlist* | *youtube.com/shorts*) setsid -f ytmpv "$arg" ;;
-    *) choose_action "$arg" ;;
+    [[ -d "$DIR" ]] || mkdir -p "$DIR"
+
+    _has -v setsid
+    _cleanup
+
+    case "$1" in
+    *png | *jpg | *jpe | *jpeg)
+        _has -v nsxiv
+        curl -sL "$1" >"$DIR/$(echo "$1" | sed "s/.*\///;s/%20/ /g")" && nsxiv -a "$DIR/$(echo "$1" | sed "s/.*\///;s/%20/ /g")" >/dev/null 2>&1 &
+        ;;
+    *pdf | *cbz | *cbr)
+        _has -v zathura
+        curl -sL "$1" >"$DIR/$(echo "$1" | sed "s/.*\///;s/%20/ /g")" && zathura "$DIR/$(echo "$1" | sed "s/.*\///;s/%20/ /g")" >/dev/null 2>&1 &
+        ;;
+    *gifv* | *gif | *mkv | *webm | *mp4 | *odysee.com*)
+        _has -v mpv
+        setsid -f mpv --really-quiet --loop "$1" >/dev/null 2>&1
+        ;;
+    *reddit.com/gallery* | *v.redd.it*)
+        _has -v tuiropen
+        setsid -f tuiropen "$1"
+        ;;
+    *youtu.be* | *youtube.com/watch* | *youtube.com/playlist* | *youtube.com/shorts*)
+        _has -v ytmpv
+        setsid -f ytmpv "$1"
+        ;;
+    *) _choose_action "$1" ;;
     esac
 
     exit 0

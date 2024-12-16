@@ -53,6 +53,17 @@ function line {
     printf "\n"
 }
 
+function separator {
+    local color="${1:-$cyan}"
+    local msg="$2"
+    local char="-"
+    local n=${#msg}
+    local reset="\033[0m"
+    printf "\n%s\n" "$msg"
+    printf "${color}%${n}s${reset}\n" | sed "s/ /$char/g"
+    printf "\n"
+}
+
 function in_terminal {
     # https://stackoverflow.com/questions/911168/how-can-i-detect-if-my-shell-script-is-running-through-a-pipe
     if [[ ! -t 1 ]]; then
@@ -174,6 +185,13 @@ function die {
     exit 1
 }
 
+function _chdir {
+    cd "$1" || {
+        echo "$1 not found"
+        exit 1
+    }
+}
+
 function has {
     local verbose=false
     if [[ $1 == '-v' ]]; then
@@ -183,10 +201,18 @@ function has {
     for c in "$@"; do
         c="${c%% *}"
         if ! command -v "$c" &>/dev/null; then
-            [[ "$verbose" == true ]] && err "$c not found"
+            [[ "$verbose" == true ]] && _logerr "'$c' dependency not found"
             return 1
         fi
     done
+}
+
+function _istty {
+    if [[ "$(tty)" =~ ^/dev/tty[0-9]+$ ]]; then
+        return 0
+    fi
+
+    return 1
 }
 
 function spinner {
@@ -207,6 +233,20 @@ function spinner {
 
     # kill spinner when primary function finish
     # kill $! 2>/dev/null
+}
+
+function _is_available {
+    local target=$1
+    shift
+    local arr=("$@")
+
+    for item in "${arr[@]}"; do
+        if [[ "$item" == "$target" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 # Only in ZSH

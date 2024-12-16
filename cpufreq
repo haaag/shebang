@@ -48,7 +48,7 @@ function _has {
     for c in "$@"; do
         c="${c%% *}"
         if ! command -v "$c" &>/dev/null; then
-            [[ "$verbose" == true ]] && _logme "'$c' dependency not found"
+            [[ "$verbose" == true ]] && _logerr "'$c' dependency not found"
             return 1
         fi
     done
@@ -68,7 +68,7 @@ function _notifyme {
         return
     fi
 
-    _has -v "notify-send" || exit 1
+    _has "notify-send" || exit 1
 
     local prog
     local mesg="<b>$1</b>"
@@ -189,7 +189,7 @@ function _menu {
 function _dialog {
     local scaling_available selection
 
-    _has -v dmenu || {
+    _has dmenu || {
         _notifyme "'dmenu' not found"
         exit 1
     }

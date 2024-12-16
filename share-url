@@ -57,7 +57,7 @@ function _get_video_title {
     echo "$title"
 }
 
-function has {
+function _has {
     local verbose=false
     local c
     if [[ $1 == '-v' ]]; then
@@ -77,7 +77,7 @@ function _url_input {
     local url
     local cmd="dmenu"
 
-    if ! has -v "$cmd"; then
+    if ! _has -v "$cmd"; then
         exit 1
     fi
 
@@ -86,15 +86,13 @@ function _url_input {
     echo "$url"
 }
 
-has -v "${DEPS[@]}"
+_has -v "${DEPS[@]}"
 
 # assert ntfy <topic>
-[[ -z "$LINKS_TOPIC" ]] && _logerr "must provide TOPIC"
+[[ -z "$LINKS_TOPIC" ]] && _logerr "must provide ntfy TOPIC"
 
 function main {
-    local url="${1-}"
-    # check clipboard
-    [[ -z "$url" ]] && url=$(xclip -o -sel clip)
+    local url="${1:-$(xclip -o -sel clip)}"
 
     if ! _is_url_valid "$url"; then
         # prompt dmenu for URL

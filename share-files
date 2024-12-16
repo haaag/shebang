@@ -17,17 +17,18 @@ DEPS=(nnn dragon-drop)
 # shellcheck source=/dev/null
 [[ -f "$HOME/.config/shell/nnn.sh" ]] && . "$HOME/.config/shell/nnn.sh"
 
-function log_err {
-    local msg="$1"
-    printf "%s: %s\n" "$PROG" "$msg" >&2
-    exit 1
-}
-
-function send_notification {
+function _notifyme {
     local prog
     local mesg="<b>$1</b>"
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
     notify-send -i "gnome-user-share" "$prog" "$mesg"
+}
+
+function _logerr {
+    local msg="$1"
+    _notifyme "$msg"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
 }
 
 function pre_exit {
@@ -37,15 +38,25 @@ function pre_exit {
     rm "$TMPFILE" 2>/dev/null
 }
 
-for dep in "${DEPS[@]}"; do
-    if ! command -v "$dep" >/dev/null; then
-        err_msg="'$dep' not found."
-        send_notification "$err_msg"
-        log_err "$err_msg"
+function _has {
+    local verbose=false
+    local c
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
     fi
-done
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "'$c' not found"
+            return 1
+        fi
+    done
+}
 
 trap pre_exit EXIT SIGTERM
+
+_has -v "${DEPS[@]}"
 
 if [[ -n "${1:-}" ]]; then
     setsid -f dragon-drop -x "$1"

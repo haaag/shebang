@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# ┏━┓╻ ╻┏━┓┏━┓┏━╸┏┓╻╺┳┓
+# ┗━┓┃ ┃┗━┓┣━┛┣╸ ┃┗┫ ┃┃
+# ┗━┛┗━┛┗━┛╹  ┗━╸╹ ╹╺┻┛
 # script to hibernate/suspend with `zzz/ZZZ`
 #
 # this script sets timers and lock files.
