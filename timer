@@ -1,61 +1,71 @@
 #!/usr/bin/env bash
 
-# ┏━┓╻  ┏━┓┏━┓┏┳┓
-# ┣━┫┃  ┣━┫┣┳┛┃┃┃
-# ╹ ╹┗━╸╹ ╹╹┗╸╹ ╹
-# set alarm
+# ╺┳╸╻┏┳┓┏━╸┏━┓
+#  ┃ ┃┃┃┃┣╸ ┣┳┛
+#  ╹ ╹╹ ╹┗━╸╹┗╸
+# set timers
 
 PROG="${0##*/}"
 DURATION="$1"
-MESG="${2:-Alarm}"
+TIMER_NAME="${2:-Timer}"
 ICON=""
 DEPS=(notify-send dmenu mpv)
 
 # files
-ALARM="$HOME/bin/assets/alarm-beepbeep.mp3"
+SOUND="$HOME/bin/assets/alarm-beepbeep.mp3"
 PIDFILE="/tmp/$PROG.pid"
 TIMEFILE="/tmp/$PROG.time"
 MPVPID="/tmp/$PROG.mpv"
 
-# TODO)):
-# - [ ] add support for multiple alarms (unique names)
+# TODO:
+# - [ ] add support for multiple timers (unique names)
 
-function log_err {
-    local msg="$1"
-    printf "%s: %s\n" "$PROG" "$msg" >&2
-    exit 1
-}
-
-function send_notification {
+function _notifyme {
     declare -a notify_args=(-r 888 --icon="alarm-timer")
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
     notify_args+=("$prog")
     notify-send "${notify_args[@]}" "$*"
 }
 
-function check_deps {
-    for dep in "${DEPS[@]}"; do
-        if ! command -v "$dep" >/dev/null; then
-            err_msg="'$dep' not found"
-            send_notification "$err_msg"
-            log_err "$err_msg"
+function _logerr {
+    local msg="$1"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    _notifyme "$msg"
+    exit 1
+}
+
+function _logme {
+    printf "%s: %s\n" "$PROG" "$1"
+}
+
+function _has {
+    local c
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "$c not found"
+            return 1
         fi
     done
+}
 
-    if [[ ! -e "$ALARM" ]]; then
-        err_msg="alarm file not found: $ALARM"
-        send_notification "$err_msg"
-        log_err "$err_msg"
-    fi
-
+function _checkdeps {
+    _has -v "${DEPS[@]}"
+    [[ ! -e "$SOUND" ]] && _logerr "timer file not found: $SOUND"
 }
 
 function pre_exit {
-    printf "%s: %s\n" "$PROG" "cleaning up..."
-    rm -f "$TIMEFILE"
-    rm -f "$PIDFILE"
-    rm -f "$MPVPID"
-    send_notification "alarm finished"
+    local files=("$TIMEFILE" "$PIDFILE" "$MPVPID")
+    for f in "${files[@]}"; do
+        [[ -e "$f" ]] && rm -f "$f"
+    done
+    _logme "cleaning up..."
+    _notifyme "timer finished"
     exit 0
 }
 
@@ -63,15 +73,15 @@ function usage {
     cat <<-EOF
 Usage: $PROG [[+|-<duration>]]
 
-    Sets a simple alarm
+    Sets timers
 
 Options:
     status          Show current status
-    cancel, stop    Remove current alarm
+    cancel, stop    Remove current timer
 EOF
 }
 
-function interpret_time {
+function _interpret_time {
     local input last_char time
     if [[ ${#1} -eq 1 ]]; then
         input="${1}m"
@@ -95,7 +105,7 @@ function interpret_time {
     echo "$time"
 }
 
-function cancel_timer {
+function _cancel_timer {
     local pid
 
     if [[ -e "$MPVPID" ]]; then
@@ -105,47 +115,47 @@ function cancel_timer {
     fi
 
     if [[ ! -e "$PIDFILE" ]]; then
-        return
+        _logerr "no timer found"
     fi
 
     pid=$(cat "$PIDFILE")
-    echo "$PROG: timer with pid=$pid cancelled"
+    _logme "timer with pid=$pid cancelled"
     kill -9 "$pid" &>/dev/null
 
     pre_exit
 }
 
-function save_pid {
+function _save_pid {
     echo "$1" | tee "$PIDFILE" >/dev/null
 }
 
-function save_timestamp {
+function _save_timestamp {
     local time="$1"
     echo "$time" | tee "$TIMEFILE" >/dev/null
 }
 
-function get_timestamp {
+function _get_timestamp {
     cat "$TIMEFILE"
 }
 
-function update_timestamp {
+function _update_timestamp {
     echo "${1:-0}" | tee "$TIMEFILE" >/dev/null
 }
 
-function update_time {
+function _update_time {
     local time new_time current
     if [[ ! -e "$TIMEFILE" ]]; then
-        err_msg="no alarm found"
-        send_notification "$err_msg"
-        log_err "$err_msg"
+        err_msg="no timer found"
+        _notifyme "$err_msg"
+        _logerr "$err_msg"
     fi
-    time=$(interpret_time "${1:-0}")
-    current=$(get_timestamp)
+    time=$(_interpret_time "${1:-0}")
+    current=$(_get_timestamp)
     new_time=$((current + time))
-    update_timestamp "$new_time"
+    _update_timestamp "$new_time"
 }
 
-function show_status {
+function _show_status {
     local current time result
     local time_diff_hours time_diff_minutes time_diff_seconds
 
@@ -154,7 +164,7 @@ function show_status {
     fi
 
     current=$(date +%s)
-    time=$(get_timestamp)
+    time=$(_get_timestamp)
     time_diff=$((time - current))
 
     if [[ "$time_diff" -lt 0 ]]; then
@@ -180,28 +190,28 @@ function show_status {
     echo "$ICON $result"
 }
 
-function sound_the_alarm {
-    send_notification "alarm with duration=$duration"
-    mpv "$ALARM" --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
+function _sound_the_alarm {
+    _notifyme "timer with duration=$duration"
+    mpv "$SOUND" --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
     mpv_pid=$!
     echo "$mpv_pid" >"$MPVPID"
 }
 
-function set_alarm {
+function _set_timer {
     trap pre_exit SIGTERM
 
-    local duration current current_time
-    duration="$1"
+    local duration="$1"
+    local current current_time
     current=$(date +%s)
-    duration=$(interpret_time "$duration")
+    duration=$(_interpret_time "$duration")
     current_time=$((current + duration))
-    save_timestamp "$current_time"
+    _save_timestamp "$current_time"
 
-    send_notification "setting alarm for $(show_status)"
+    _notifyme "setting timer for $(_show_status)"
 
     while true; do
         current=$(date +%s)
-        time=$(get_timestamp)
+        time=$(_get_timestamp)
         time_diff=$((current - time))
         time_diff=${time_diff#-}
         if [[ $time_diff -le 0 ]]; then
@@ -210,61 +220,61 @@ function set_alarm {
         sleep 1s
     done
 
-    sound_the_alarm
+    _sound_the_alarm
 }
 
-function get_duration {
+function _get_input {
+    local data
+    local icon=""
+    local prompt="$1"
+    data=$(: | dmenu -i -p "$icon $prompt")
+    echo "$data"
+}
+
+function _get_duration {
     local icon=""
     DURATION=$(: | dmenu -i -p "$icon Duration:")
     echo "$DURATION"
 }
 
-function main {
-    check_deps
-
-    local pid
-
-    case "${1-}" in
-    -h | --help)
+function parse_and_exit {
+    case "$1" in
+    status)
+        _show_status
+        exit 0
+        ;;
+    -h | --help | help)
         usage
         exit 1
         ;;
+    cancel | stop | kill)
+        _cancel_timer
+        ;;
     +*)
-        update_time "$@"
+        _update_time "$@"
         exit 0
         ;;
     -*)
-        update_time "$@"
+        _update_time "$@"
         exit 0
-        ;;
-    "status")
-        show_status
-        exit
-        ;;
-    cancel | stop | kill)
-        cancel_timer
-        exit 0
-        ;;
-    help)
-        usage
-        exit 1
         ;;
     *) ;;
     esac
+}
 
+function main {
+    local opt="${1:-}"
+    parse_and_exit "$opt"
+    _checkdeps
     if [[ -z "$DURATION" ]]; then
-        DURATION=$(get_duration)
+        DURATION=$(_get_input "Duration>")
     fi
 
     [[ -z "$DURATION" ]] && exit 1
 
-    if [[ "$DURATION" =~ ^(cancel|stop|kill)$ ]]; then
-        cancel_timer
-    fi
-
-    pid=$$
-    save_pid "$pid"
-    set_alarm "$DURATION" "$MESG"
+    local pid=$$
+    _save_pid "$pid"
+    _set_timer "$DURATION" "$TIMER_NAME"
 }
 
 main "$@"
