@@ -3,17 +3,18 @@
 # ╺┳┓╻ ╻┏┓╻┏━┓╺┳╸
 #  ┃┃┃ ┃┃┗┫┗━┓ ┃
 # ╺┻┛┗━┛╹ ╹┗━┛ ╹
+# themes helper
+# requires: dunst
 
-# simple script to load dunst themes.
-# requires: dunst, dunstify
-
-set -e
+set -eou pipefail
 
 # TODO)):
 # - [ ] add option to create default settings.
+# - [ ] add option to edit default settings.
+# - [ ] create backup of original settings.
 
 PROG=$(basename "$0")
-DEPS=(dunstify dunst)
+DEPS=(dunst)
 DOT="\u2022"
 
 # files
@@ -29,7 +30,9 @@ HEADER="# DO NOT EDIT! This file will be overwritten by $PROG script.
 
 function usage {
     cat <<-_EOF
-Usage: $PROG [options]
+Usage: $PROG [Options]
+
+    Set dunst themes
 
 Options:
     -s, --set <name>      Set theme
@@ -45,40 +48,72 @@ Locations:
 _EOF
 }
 
-function log_err {
+function _logerr {
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
 }
 
-function logme {
+function _logme {
     printf "%s: %s\n" "$PROG" "$1"
 }
 
-function notify {
-    local msg="$1"
-    export DISPLAY=":0"
-    dunstify -i gnome-settings-theme "$PROG" "$msg"
+function _has {
+    local c
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logme "'$c' not found"
+            return 1
+        fi
+    done
 }
 
-function reload {
-    local retcode mesg
-    mesg="$1"
+function _notifyme {
+    local prog
+    local mesg="<b>$1</b>"
+    export DISPLAY=":0"
+    local icon="${2:-gnome-settings-theme}"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    dunstify -i "$icon" "$prog" "$mesg"
+}
 
-    pkill -9 dunst >/dev/null
-    retcode="$?"
+function _start_dunst {
+    if pidof dunst >/dev/null; then
+        _logme "dunst is already running"
+        return
+    fi
+
+    _notifyme "dunst is starting"
+}
+
+function _reload_dunst {
+    local mesg="$1"
+
+    if ! pidof dunst >/dev/null; then
+        _start_dunst
+        return
+    fi
+
+    pkill -HUP dunst >/dev/null
+    local retcode="$?"
 
     if [[ "$retcode" -eq 0 && -n "$mesg" ]]; then
-        notify "$mesg"
+        _notifyme "$mesg"
     fi
 }
 
-function backup_rc {
+function _backup_rc {
     local file="$1"
     mv "$file" "${file}.bk"
-    log_err "NotImplementedError"
+    _logerr "NotImplementedError"
 }
 
-function get_theme {
+function _get_theme {
     local name base result
     name="$1"
 
@@ -92,7 +127,7 @@ function get_theme {
     echo "$result"
 }
 
-function create_theme {
+function _create_theme {
     local theme="$1"
     local name="$2"
 
@@ -104,24 +139,24 @@ function create_theme {
         echo "$HEADER"
         cat "$DEFAULTS"
         cat "$theme"
-    } >>"$DUNSTRC"
+    } >"$DUNSTRC"
 
-    reload "<b>$name</b> loaded"
+    _reload_dunst "<b>$name</b> loaded"
 }
 
-function set_theme {
+function _set_theme {
     local theme name
     name="$1"
-    theme=$(get_theme "$name")
+    theme=$(_get_theme "$name")
 
     if [[ -z "$theme" ]]; then
-        log_err "theme '$1' not found"
+        _logerr "theme '$1' not found"
     fi
 
-    create_theme "$theme" "$name"
+    _create_theme "$theme" "$name"
 }
 
-function list_themes {
+function _list_themes {
     local theme
     printf "Usage: %s --set <name>" "$PROG"
     printf "\n\nThemes:\n"
@@ -132,43 +167,39 @@ function list_themes {
     exit 0
 }
 
-function edit_defaults {
+function _edit_defaults {
     "${EDITOR:-vim}" "$DEFAULTS"
 }
 
-function create_defaults {
+function _create_defaults {
     local current_rc
     # shellcheck disable=2034
     current_rc=$(cat "$DUNSTRC")
 
     # echo "$current_rc"
-    log_err "NotImplementedError"
+    _logerr "NotImplementedError"
 }
 
 function main {
-    local option="$1"
-    local theme="$2"
+    local opt="${1:-}"
+    local theme="${2:-}"
 
-    for cmd in "${DEPS[@]}"; do
-        if ! command -v "$cmd" >/dev/null; then
-            log_err "'$cmd' not found"
-        fi
-    done
+    _has -v "${DEPS[@]}" || exit 1
 
     # exit if defaults not found
     if [[ ! -f "$DEFAULTS" ]]; then
         usage
         echo
-        logme "use '-c, --create'"
-        log_err "settings file '$DEFAULTS' not found"
+        _logme "use '-c, --create'"
+        _logerr "settings file '$DEFAULTS' not found"
     fi
 
-    case "$option" in
-    -s | *set) set_theme "$2" ;;
-    -e | *edit) edit_defaults ;;
-    # -c | *create) create_defaults ;;
-    -l | *list) list_themes ;;
-    -r | *reload) reload "configuration <b>reloaded</b>" ;;
+    case "$opt" in
+    -s | *set) _set_theme "$2" ;;
+    -e | *edit) _edit_defaults ;;
+    -c | *create) _create_defaults ;;
+    -l | *list) _list_themes ;;
+    -r | *reload) _reload_dunst "configuration <b>reloaded</b>" ;;
     *) usage ;;
     esac
 }
