@@ -17,6 +17,7 @@ PASS=$(which pass)
 EDITOR="nvim -u NONE"
 TERMINAL=${TERMINAL:-st}
 PASSWORD_STORE_CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-15}
+FAVORITES=${PASSWORD_STORE_DIR:-~/.local/share/pass}/favorites
 #                         
 
 # menu
@@ -49,6 +50,8 @@ Usage: $PROG [options]
 
 options:
     -m, --menu      Select password with menu
+    -a, --add       Add new password
+    -f, --fav       Choose from favorites
     -e, --edit      Edit selected password
     -l, --list      List all passwords
     -o, --otp       Copy one-time-password
@@ -287,6 +290,7 @@ function _action {
     otp) _pwd_otp_code "$pwd" ;;
     typed) _pwd_type "$pwd" ;;
     show) _pwd_show "$pwd" ;;
+    favorite) _fav_add "$pwd" ;;
     remove) _pwd_remove "$pwd" ;;
     *) _logerr "invalid action: '$pwd'" ;;
     esac
@@ -304,13 +308,61 @@ function _select_action {
     options+=("${ICONS[otp]} otp")
     options+=("${ICONS[show]} show")
     options+=("${ICONS[typed]} typed")
-    options+=("${ICONS[favorite]} favorite")
+    if _has_line "$pwd" "$FAVORITES"; then
+        options+=("${ICONS[favorite_added]} favorite")
+    else
+        options+=("${ICONS[favorite]} favorite")
+    fi
     options+=("${ICONS[remove]} remove")
 
     cmd=$(_select "$prompt" "$color" "${options[@]}")
     if (printf '%s\n' "${options[@]}" | grep -x -q "$cmd"); then
         _action "$(echo "$cmd" | cut -d' ' -f2)" "$pwd"
     fi
+}
+
+function _fav_add {
+    local pwd="$1"
+    [[ -z "${pwd}" ]] && _logerr "fav: no password given"
+    [[ ! -f "$FAVORITES" ]] && touch "$FAVORITES"
+
+    if _has_line "$pwd" "$FAVORITES"; then
+        _fav_remove "$pwd"
+        return
+    fi
+
+    echo "$pwd" >>"$FAVORITES"
+    _notifyme "fav: added <i>'${pwd}'</i> to favorites"
+    _logme "password '${pwd}' added to favorites"
+}
+
+function _fav_remove {
+    local pwd="$1"
+    [[ -z "${pwd}" ]] && exit
+    [[ ! -f "$FAVORITES" ]] && _logerr "fav remove: file not found"
+
+    local escaped_pwd
+    escaped_pwd=$(printf '%s\n' "$pwd" | sed -e 's/[]\/$*.^[]/\\&/g')
+
+    sed -i "/^${escaped_pwd}\$/d" "$FAVORITES"
+    retcode=$?
+    if [[ "$retcode" -ne 0 ]]; then
+        _logerr "fav remove: failed to remove <i>'${pwd}'</i>"
+    fi
+
+    _notifyme "fav remove: removed <i>'${pwd}'</i>"
+    _logme "password '${pwd}' removed from favorites"
+}
+
+function _fav_pwd {
+    local pwd
+    [[ -f "$FAVORITES" ]] || _logerr "fav: file not found"
+
+    local items
+    mapfile -t items < <(cat "$FAVORITES")
+    pwd=$(_select "${ICONS[favorite]} Favorites> " "$YELLOW" "${items[@]}")
+
+    _select_action "$pwd"
 }
 
 function _menu {
@@ -349,6 +401,10 @@ function main {
     -a | --add | add)
         _add_pwd
         ;;
+    -f | --fav | fav)
+        shift
+        _fav_pwd "$@"
+        ;;
     -e | --edit | edit)
         shift
         _pwd_edit "$@"
@@ -372,6 +428,7 @@ function main {
         ;;
     *) _menu ;;
     esac
+
 }
 
 main "$@"
