@@ -17,8 +17,7 @@ sudo --askpass --reset-timestamp
 # xbps-query -p install-date -s '' | sort -k2
 # xbps-query -p install-date -s '' | sort -t: -k2 | column -t -s: -o: | grep -e "${1:-.}"
 
-PROG=$(basename "$0")
-DEPS=(fzf)
+PROG="${0##*/}"
 LOGGER="${LOGS_PATH:-$HOME/dcs/log/}/void.log"
 BULLET="\u2022"
 
@@ -33,16 +32,6 @@ ICONS[query]=""
 ICONS[help]=""
 ICONS[exit]=""
 
-# Menu options
-install="${ICONS[install]} install"
-search="${ICONS[search]} search"
-update="${ICONS[update]} update"
-uninstall="${ICONS[uninstall]} uninstall"
-clean="${ICONS[clean]} clean"
-query="${ICONS[query]} query"
-help="${ICONS[help]} help"
-exit="${ICONS[exit]} exit"
-
 # Style
 BOLD=$(tput bold)
 DIM=$(tput dim)
@@ -51,16 +40,14 @@ RESET="$(tput sgr0)"
 BLUE=$(tput setaf 4)
 RED=$(tput setaf 1)
 CYAN=$(tput setaf 6)
-YELLOW=$(tput setaf 3)
 MAGENTA=$(tput setaf 5)
-WHITE=$(tput setaf 7)
 
-function notification {
+function _notifyme {
     local icon="dialog-error-symbolic.svg"
     notify-send --icon="$icon" "$1" "$2"
 }
 
-function logger {
+function _logerr {
     from="${1:-LOG}"
     shift
     mesg="$*"
@@ -68,26 +55,27 @@ function logger {
     echo "[$date]::[$PROG]::[$from]::${mesg}" | tee -a "${LOGGER}" >/dev/null
 }
 
-function title {
-    # printf "\n"
-    # echo -e "${BOLD}${FG_BLUE}Void${RESET} $1"
-    printf "\n%b%bVoid%b %s\n\n" "${BOLD}" "${BLUE}" "${RESET}" "${1}"
-    # printf "\n"
-}
-
-function dependencies {
-    local cmd
-    for cmd in "${DEPS[@]}"; do
-        if ! command -v "$cmd" >/dev/null; then
-            err_msg="'$cmd' command not found."
-            notification "$PROG script" "$err_msg"
-            title "$err_msg"
-            exit 1
+function _has {
+    local c
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "$c not found"
+            return 1
         fi
     done
 }
 
-function preview {
+function _titleme {
+    printf "%b%bVoid%b %s\n\n" "${BOLD}" "${BLUE}" "${RESET}" "${1}"
+}
+
+function _preview {
     local i
     for i in "$@"; do
         version=${i##*-}
@@ -97,7 +85,8 @@ function preview {
     echo
 }
 
-function warning {
+function _warn {
+    local i
     for i in "$@"; do
         version=${i##*-}
         pkg=${i%-*}
@@ -106,94 +95,127 @@ function warning {
     echo
 }
 
-function mdate {
-    printf "\n"
-    echo -e "${MAGENTA} xbps ${RESET} ${WHITE} helper $RESET"
-}
-
-function get_installed_pkgs {
+function _xbps_installed_pkgs {
     packages=$(xbps-query -s "")
     echo "$packages"
 }
 
-function get_all_pkgs {
+function _xbps_all_pkgs {
     packages=$(xbps-query -Rs "*")
     echo "$packages"
 }
 
-function update {
-    title "${BLUE}Syncing repositories${RESET}"
+function _xbps_update {
+    _titleme "${BLUE}Syncing repositories${RESET}"
     sudo xbps-install -Su
 }
 
-function install {
-    local selected query
-    query="${1-""}" selected=$(xbps-query -Rs "$query" | awk '{print $2}' | fzf \
-        --multi \
-        --prompt="Select packages> " \
-        --marker=" " \
-        --preview='xbps-query -R {}' \
-        --border-label=" Available Packages " \
-        --preview-label='[ Package Information ]' \
-        --preview-label-pos='0:bottom')
+function _get_fzf_defaults {
+    local height="${1:-45%}"
+    declare -a defaults=(
+        --border=sharp
+        --layout=reverse-list
+        --ansi
+        --no-preview
+    )
 
-    if [[ -z "$selected" ]]; then
+    if [[ -n "$TMUX" ]]; then
+        defaults+=(--tmux "center,${height}%")
+    else
+        defaults+=(--height="${height}%")
+    fi
+
+    printf '%s\n' "${defaults[@]}"
+}
+
+function _install {
+    local selected fzf_opts
+    local query="${1:-}"
+
+    mapfile -t fzf_opts < <(_get_fzf_defaults "80")
+    fzf_opts+=(--multi)
+    fzf_opts+=(--prompt="${ICONS[install]} Packages> ")
+    fzf_opts+=(--marker=" ")
+    fzf_opts+=(--preview='xbps-query -R {}')
+    fzf_opts+=(--border-label="<Available Packages>")
+    fzf_opts+=(--preview-label='[ Package Information ]')
+    fzf_opts+=(--preview-label-pos='0:bottom')
+    fzf_opts+=(--color header:italic)
+    fzf_opts+=(--header 'Press CTRL-/ to toggle package information')
+
+    mapfile -t selected < <(xbps-query -Rs "$query" | awk '{print $2}' | fzf "${fzf_opts[@]}")
+    if [[ "${#selected[@]}" -eq 0 ]]; then
         exit 1
     fi
 
-    title "${CYAN}Install${RESET}"
-    # shellcheck disable=SC2086
-    preview $selected
-    # shellcheck disable=SC2086
-    sudo xbps-install -Su $selected
-    # shellcheck disable=SC2086
-    logger "INSTALL		" $selected
+    _titleme "${CYAN}Install${RESET}"
+    _preview "${selected[@]}"
+
+    # installation
+    sudo xbps-install -Su "${selected[@]}"
+    retcode=$?
+    if [[ $retcode -eq 0 ]]; then
+        _logerr "INSTALL		" "${selected[*]}"
+    fi
 }
 
-function uninstall {
-    local pkg_name selected query
-    query="${1-""}"
-    pkgs=$(get_installed_pkgs)
-    # pkg_name=$(get_installed_pkgs | awk '{ print $2 }')
-    pkg_name=$(echo "$pkgs" | awk '{ print $2 }')
-    selected=$(echo "$pkg_name" | fzf \
-        --multi \
-        --prompt="Select packages> " \
-        --marker=" " \
-        --preview='xbps-query -f {}' \
-        --preview-label='[ Package Information ]' \
-        --query="$query" \
-        --preview-label-pos='0:bottom')
+function _uninstall {
+    local selected fzf_opts
+    local query="${1:-}"
 
-    if [[ -z "$selected" ]]; then
+    mapfile -t fzf_opts < <(_get_fzf_defaults "80")
+    fzf_opts+=(--multi)
+    fzf_opts+=(--query="$query")
+    fzf_opts+=(--prompt="${ICONS[uninstall]} Packages> ")
+    fzf_opts+=(--marker=" ")
+    fzf_opts+=(--preview='xbps-query -f {}')
+    fzf_opts+=(--border-label="<Installed Packages>")
+    fzf_opts+=(--preview-label='[ Package Information ]')
+    fzf_opts+=(--preview-label-pos='0:bottom')
+    fzf_opts+=(--color header:italic)
+    fzf_opts+=(--header 'Press CTRL-/ to toggle package information')
+
+    mapfile -t selected < <(_xbps_installed_pkgs | awk '{ print $2 }' | fzf "${fzf_opts[@]}")
+    if [[ "${#selected[@]}" -eq 0 ]]; then
         exit 1
     fi
 
-    title "${RED}Uninstalling packages${RESET}"
-    # shellcheck disable=SC2086
-    warning $selected
-    # shellcheck disable=SC2086
-    sudo xbps-remove -R $selected
-    # shellcheck disable=SC2086
-    logger "UNINSTALL	" $selected
+    _titleme "${RED}Uninstalling packages${RESET}"
+    _warn "${selected[@]}"
+
+    # uninstall
+    sudo xbps-remove -R "${selected[@]}"
+    retcode=$?
+    if [[ $retcode -eq 0 ]]; then
+        _logerr "UNINSTALL	" "${selected[@]}"
+    fi
 }
 
-function search {
+function _search {
+    local fzf_opts selected
     # TODO: Improve display.
     # [ ] pkg name and version separated
     # [ ] pkg description new line
-    query="${1-""}"
-    title "${YELLOW}Search${RESET}"
-    selected=$(
-        xbps-query -Rs "$query" | awk '{print $2}' | fzf \
-            --preview='xbps-query -R {}' \
-            --preview-label='[ Package Information ]'
-    )
+    local query="${1-""}"
+
+    mapfile -t fzf_opts < <(_get_fzf_defaults "80")
+    fzf_opts+=(--prompt="${ICONS[search]} Packages> ")
+    fzf_opts+=(--preview='xbps-query -R {}')
+    fzf_opts+=(--border-label="<Searching Packages>")
+    fzf_opts+=(--preview-label='[ Package Information ]')
+    fzf_opts+=(--preview-label-pos='0:bottom')
+    fzf_opts+=(--color header:italic)
+    fzf_opts+=(--header 'Press CTRL-/ to toggle package information')
+
+    selected=$(xbps-query -Rs "$query" | awk '{print $2}' | fzf "${fzf_opts[@]}")
+    if [[ -z "$selected" ]]; then
+        exit 1
+    fi
 }
 
 function query {
     local selected
-    selected=$(xbps-query -l | awk '{ print $2 }' | fzf \
+    selected=$(xbps-query -l | awk '{ print $2 }' | fzf --tmux "center,80%" \
         --preview='xbps-query -f {}' \
         --preview-label='[ Package Files ]' \
         --preview-label-pos='0:bottom')
@@ -206,7 +228,7 @@ function query {
 }
 
 function clean {
-    title "${CYAN}Cleaning obsolete binary packages and orphans packages${RESET}"
+    _titleme "${CYAN}Cleaning obsolete binary packages and orphans packages${RESET}"
     sudo xbps-remove -Oo
 }
 
@@ -214,7 +236,7 @@ function show_log {
     ${EDITOR:-vim} "${LOGGER}"
 }
 
-function usage {
+function _usage {
     cat <<-_EOF
 Usage: $PROG [command]
 
@@ -234,50 +256,49 @@ _EOF
 }
 
 function menu {
-    local options
-    declare -a options
+    local command fzf_opts
+    declare -a options=()
 
-    options+=("$install")
-    options+=("$search")
-    options+=("$update")
-    options+=("$uninstall")
-    options+=("$clean")
-    options+=("$query")
-    options+=("$help")
-    options+=("$exit")
+    options+=("${ICONS[install]} install")
+    options+=("${ICONS[search]} search")
+    options+=("${ICONS[update]} update")
+    options+=("${ICONS[uninstall]} uninstall")
+    options+=("${ICONS[clean]} clean")
+    options+=("${ICONS[query]} query")
+    options+=("${ICONS[help]} help")
+    options+=("${ICONS[exit]} exit")
 
-    command=$(printf '%s\n' "${options[@]}" | fzf \
-        --layout=reverse-list \
-        --height=45% \
-        --border=sharp \
-        --prompt="${PROG}> " \
-        --pointer='→' \
-        --ansi \
-        --no-preview)
+    mapfile -t fzf_opts < <(_get_fzf_defaults "40")
+    fzf_opts+=(--prompt="XBPS> ")
+    fzf_opts+=(--pointer='→')
+    fzf_opts+=(--border-label='<XBPS Helper>')
+    fzf_opts+=(--preview-label='[ Package Information ]')
+
+    command=$(printf '%s\n' "${options[@]}" | fzf "${fzf_opts[@]}")
 
     (printf '%s\n' "${options[@]}" | grep -x -q "$command") &&
         main "$(echo "$command" | cut -d' ' -f2)"
 }
 
 function main {
-    dependencies
+    _has -v fzf
 
     case "$1" in
-    -u | update) update ;;
-    -i | install) shift && install "$@" ;;
-    -U | uninstall) shift && uninstall "$@" ;;
+    -u | update) _xbps_update ;;
+    -i | install) shift && _install "$@" ;;
+    -U | uninstall) shift && _uninstall "$@" ;;
     -q | query) shift && query "$@" ;;
-    -s | search) shift && search "$@" ;;
+    -s | search) shift && _search "$@" ;;
     -c | clean) clean ;;
     -l | log) show_log ;;
-    -h | help) usage ;;
+    -h | help) _usage ;;
     exit) exit 0 ;;
     *) menu ;;
     esac
 }
 
 if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
-    usage
+    _usage
 fi
 
 main "$@"
