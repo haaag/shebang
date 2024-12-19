@@ -3,25 +3,32 @@
 # ┏━╸╻╻  ┏━╸┏━┓
 # ┣╸ ┃┃  ┣╸ ┗━┓
 # ╹  ╹┗━╸┗━╸┗━┛
-# simple file-selector and share with dragon-drop
-# deps: <nnn> <dragon-drop>
+# simple file-selector and share with <dragon-drop> | <localsend>
+# deps: <nnn> <dragon-drop> <localsend>
 
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euo pipefail
 
 PROG="${0##*/}"
 TMPFILE="$(mktemp -t "$PROG.XXXXXX")"
-DEPS=(nnn dragon-drop)
 
 # shellcheck source=/dev/null
 [[ -f "$HOME/.config/shell/nnn.sh" ]] && . "$HOME/.config/shell/nnn.sh"
 
-function _notifyme {
-    local prog
-    local mesg="<b>$1</b>"
-    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
-    notify-send -i "gnome-user-share" "$prog" "$mesg"
+function _usage {
+    cat <<-EOF
+Usage: $PROG [COMMAND]
+
+    Drop files with <dragon-drop>
+    Send files with <localsend>
+
+Commands:
+    -d, --drag      Drag and drop files
+    -s, --send      Send files locally
+EOF
+}
+
+function _detach_cmd {
+    nohup "$@" >"/dev/null" 2>&1 &
 }
 
 function _logerr {
@@ -29,13 +36,6 @@ function _logerr {
     _notifyme "$msg"
     printf "%s: %s\n" "$PROG" "$msg" >&2
     exit 1
-}
-
-function pre_exit {
-    if [[ ! -f "$TMPFILE" ]]; then
-        return
-    fi
-    rm "$TMPFILE" 2>/dev/null
 }
 
 function _has {
@@ -54,17 +54,72 @@ function _has {
     done
 }
 
-trap pre_exit EXIT SIGTERM
+function _notifyme {
+    _has -v notify-send || return
+    local prog
+    local mesg="<b>$1</b>"
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+    notify-send -i "gnome-user-share" "$prog" "$mesg"
+}
 
-_has -v "${DEPS[@]}"
+function _preexit {
+    if [[ -f "$TMPFILE" ]]; then
+        rm "$TMPFILE" 2>/dev/null
+    fi
+}
 
-if [[ -n "${1:-}" ]]; then
-    setsid -f dragon-drop -x "$1"
-    exit 0
-fi
+function _select_file {
+    _has -v nnn
+    nnn -p "$TMPFILE"
+}
 
-nnn -p "$TMPFILE"
+function _dragon_drop {
+    _has -v dragon-drop
+    local file="${1:-}"
 
-if [[ -f "$TMPFILE" ]]; then
-    setsid -f dragon-drop --and-exit --stdin --on-top <"$TMPFILE"
-fi
+    if [[ -f "$file" ]]; then
+        setsid -f dragon-drop -x "$file"
+        exit 0
+    fi
+
+    _select_file
+
+    if [[ -f "$TMPFILE" ]]; then
+        setsid -f dragon-drop --and-exit --stdin --on-top <"$TMPFILE"
+    fi
+}
+
+function _localsend {
+    _has -v localsend
+    local files=("$@")
+
+    if [[ ${#files[@]} -eq 0 ]]; then
+        # select files
+        _select_file
+        while IFS= read -r f; do
+            files+=("$f")
+        done <"$TMPFILE"
+    fi
+
+    for file in "${files[@]}"; do
+        echo "f::$file"
+    done
+
+    _notifyme "Sending ${#files[@]} files with localsend..."
+    _detach_cmd localsend "${files[@]}"
+}
+
+trap _preexit EXIT SIGTERM
+
+function main {
+    case "${1:-}" in
+    -s | --send)
+        shift
+        _localsend "$@"
+        ;;
+    -h | --help) _usage ;;
+    *) _dragon_drop "$@" ;;
+    esac
+}
+
+main "$@"
