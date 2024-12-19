@@ -8,11 +8,6 @@
 
 shopt -s nullglob globstar
 
-# TODO:
-# - [x] remove hex-colors, use names: red, blue...
-# - [x] remove WAYLAND check
-# - [ ] add fzf for tty usage
-
 PROG="${0##*/}"
 DEPS=(notify-send xdotool pass dmenu)
 PASS=$(which pass)
@@ -22,10 +17,25 @@ PASS=$(which pass)
 EDITOR="nvim -u NONE"
 TERMINAL=${TERMINAL:-st}
 PASSWORD_STORE_CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-15}
+#                         
 
 # menu
-MENU="dmenu"
-declare -a MENU_ARGS=(-l 10)
+declare -A ICONS
+ICONS["prompt"]=""
+ICONS["add"]=""
+ICONS["copy"]=""
+ICONS["edit"]=""
+ICONS["otp"]=""
+ICONS["typed"]=""
+ICONS["show"]=""
+ICONS["favorite"]=""
+ICONS["favorite_added"]=""
+ICONS["action"]=""
+ICONS["remove"]=""
+
+MENU=
+PROMPT="${ICONS[prompt]} PassMenu> "
+declare -a MENU_OPTS=()
 
 # colors
 BLUE="#458588"
@@ -68,143 +78,8 @@ function _logerr {
     exit 1
 }
 
-function _get_password_paths {
-    local prefix=${PASSWORD_STORE_DIR-~/.password-store}
-    local pwd_files
-    pwd_files=("$prefix"/**/*.gpg)
-    pwd_files=("${pwd_files[@]#"$prefix"/}")
-    pwd_files=("${pwd_files[@]%.gpg}")
-    printf '%s\n' "${pwd_files[@]}"
-}
-
-function _get_pass_with_menu {
-    local prompt passwords
-    declare -a passwords=()
-    prompt="${1:-"Pass>"}"
-    MENU_ARGS+=(-p "$prompt")
-    shift
-
-    if [[ -n "$*" && "$MENU" == "dmenu" ]]; then
-        # shellcheck disable=SC2128
-        MENU_ARGS+=("$@")
-    fi
-
-    mapfile -t passwords < <(_get_password_paths)
-    password=$(printf "%s\n" "${passwords[@]}" | "$MENU" "${MENU_ARGS[@]}")
-    echo "$password"
-}
-
-function _edit_pwd {
-    shift
-    local pwd="$1"
-
-    if [[ -z "$pwd" ]]; then
-        pwd=$(_get_pass_with_menu "PassEdit> " "-sb" "$RED")
-    fi
-
-    [[ -z $pwd ]] && exit
-
-    $TERMINAL -e "$PASS" edit "$pwd"
-    exit 0
-}
-
-function _menu {
-    local icon=""
-    local password mesg
-    password=$(_get_pass_with_menu "${icon} Password> " "-sb" "$BLUE")
-
-    [[ -z "${password}" ]] && exit
-
-    "$PASS" show -c "$password" 2>/dev/null
-    retcode=$?
-
-    if [[ "$retcode" -ne 0 ]]; then
-        _logerr "no password found for <i>'${password}'</i>"
-    fi
-
-    mesg="Copied $icon <b>${password}</b> to clipboard.\n\n"
-    mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
-    _notifyme "$mesg"
-    exit 0
-}
-
-function _show_pwd {
-    local icon=""
-    local password mesg
-    password=$(_get_pass_with_menu "${icon} Password> " "-sb" "$BLUE")
-
-    [[ -z "${password}" ]] && exit
-
-    "$PASS" show "$password" 2>/dev/null
-    retcode=$?
-
-    if [[ "$retcode" -ne 0 ]]; then
-        _logerr "no password found for <i>'${password}'</i>"
-    fi
-}
-
-function _list_path {
-    local pwd_path
-    local icon=""
-    pwd_path=$(_get_pass_with_menu "${icon} PassList> " "-sb" "$YELLOW")
-    [[ -z "${pwd_path}" ]] && exit
-    echo "$pwd_path"
-    exit 0
-}
-
-function _otp_code {
-    local password mesg
-    local icon=""
-    password=$(_get_pass_with_menu "${icon} PassOTP> " "-sb" "$YELLOW")
-
-    [[ -z "${password}" ]] && exit
-
-    "$PASS" otp -c "${password}"
-    retcode=$?
-
-    if [[ "$retcode" -gt 0 ]]; then
-        _logerr "no OTP found for ${password}"
-    fi
-
-    mesg="Copied $icon <b>OTP</b> code for <b>${password}</b> to clipboard.\n\n"
-    mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
-    _notifyme "$mesg"
-    exit 0
-}
-
-function _type_pwd {
-    shift
-    local password="$1"
-    local icon=" "
-    local _xdotool="xdotool type --clearmodifiers --file -"
-
-    if [[ -z "${password}" ]]; then
-        password=$(_get_pass_with_menu "${icon} PassType>" "-sb" "$MAGENTA")
-    fi
-
-    [[ -z "${password}" ]] && exit
-
-    "$PASS" show "$password" | {
-        IFS= read -r pass
-        printf %s "$pass"
-    } | $_xdotool
-    exit 0
-}
-
-# if [[ -n $WAYLAND_DISPLAY ]]; then
-#     MENU="dmenu-wl"
-#     XDOTOOL="ydotool type --file -"
-# elif [[ -n $DISPLAY ]]; then
-#     XDOTOOL="xdotool type --clearmodifiers --file -"
-# else
-#     _logerr "no <b>x11/wayland</b> display detected"
-# fi
-
-function _check_pass {
-    local retcode
-    "$PASS" >/dev/null
-    retcode="$?"
-    return "$retcode"
+function _logme {
+    printf "%s: %s\n" "$PROG" "$1"
 }
 
 function _has {
@@ -222,6 +97,235 @@ function _has {
     done
 }
 
+function _has_line {
+    local pwd="$1"
+    local file="$2"
+    [[ -z "${pwd}" ]] && exit
+
+    if ! grep -q "^$pwd$" "$file"; then
+        return 1
+    fi
+
+    return 0
+}
+
+function _in_terminal {
+    if [[ ! -t 1 ]]; then
+        return 1
+    fi
+    return 0
+}
+
+function _select {
+    local prompt="${1:-"$PROMPT"}"
+    local color="${2:-$BLUE}"
+    local item
+    shift
+    shift
+    local items=("$@")
+
+    if [[ "$MENU" == "dmenu" ]]; then
+        MENU_OPTS+=(-p "$prompt")
+        MENU_OPTS+=(-sb "$color")
+    else
+        MENU_OPTS+=(--prompt="$prompt")
+        MENU_OPTS+=(--color="prompt:$color")
+    fi
+
+    item=$(printf "%s\n" "${items[@]}" | "$MENU" "${MENU_OPTS[@]}")
+    echo "$item"
+}
+
+function _pwd_paths {
+    local prefix=${PASSWORD_STORE_DIR-~/.password-store}
+    local pwd_files
+    pwd_files=("$prefix"/**/*.gpg)
+    pwd_files=("${pwd_files[@]#"$prefix"/}")
+    pwd_files=("${pwd_files[@]%.gpg}")
+    printf '%s\n' "${pwd_files[@]}"
+}
+
+function _pwd_select {
+    local prompt="${1:-"$PROMPT"}"
+    local color="${2:-$BLUE}"
+    mapfile -t passwords < <(_pwd_paths)
+
+    local pwd
+    pwd=$(_select "$prompt" "$color" "${passwords[@]}")
+    [[ -z "$pwd" ]] && exit
+    echo "$pwd"
+}
+
+function _pwd_edit {
+    local pwd="$1"
+    if [[ -z "$pwd" ]]; then
+        pwd=$(_pwd_select "${ICONS[edit]} PassEdit> " "$RED")
+    fi
+
+    [[ -z $pwd ]] && exit
+
+    if _in_terminal; then
+        if [[ -n "$TMUX" ]]; then
+            tmux display-popup -E -w 65% -h 65% "$PASS edit $pwd"
+        else
+            "$PASS" edit "$pwd"
+        fi
+    else
+        $TERMINAL -e "$PASS" edit "$pwd"
+    fi
+    exit 0
+}
+
+function _pwd_copy {
+    local pwd="$1"
+    [[ -z "${pwd}" ]] && _logerr "copy: no password given"
+
+    "$PASS" show -c "$pwd" 2>/dev/null
+    retcode=$?
+    if [[ "$retcode" -ne 0 ]]; then
+        _logerr "no password found for <i>'${pwd}'</i>"
+    fi
+
+    local mesg
+    mesg="Copied $icon <b>${pwd}</b> to clipboard.\n\n"
+    mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
+    _notifyme "$mesg"
+    exit 0
+}
+
+function _pwd_show {
+    local pwd="$1"
+    if [[ -z "$pwd" ]]; then
+        pwd=$(_pwd_select "${ICONS[show]} Password> " "$BLUE")
+    fi
+    [[ -z "${pwd}" ]] && exit
+
+    if _in_terminal; then
+        "$PASS" show "$pwd"
+    else
+        $TERMINAL -e "$PASS" show "$pwd"
+    fi
+    exit 0
+}
+
+function _pwd_list {
+    local pwd_path
+    local icon=""
+    pwd_path=$(_pwd_select "${icon} PassList> " "$YELLOW")
+    [[ -z "${pwd_path}" ]] && exit
+    echo "$pwd_path"
+    exit 0
+}
+
+function _pwd_otp_code {
+    local icon=""
+    local pwd="$1"
+    if [[ -z "${pwd}" ]]; then
+        pwd=$(_pwd_select "${icon} PassOTP> " "$YELLOW")
+    fi
+
+    [[ -z "${pwd}" ]] && exit 1
+
+    "$PASS" otp -c "${pwd}"
+    retcode=$?
+
+    if [[ "$retcode" -gt 0 ]]; then
+        _logerr "no OTP found for ${pwd}"
+    fi
+
+    local mesg
+    mesg="Copied $icon <b>OTP</b> code for <b>${pwd}</b> to clipboard.\n\n"
+    mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
+    _notifyme "$mesg"
+    exit 0
+}
+
+function _pwd_type {
+    local pwd="$1"
+    local icon=" "
+    local _xdotool="xdotool type --clearmodifiers --file -"
+
+    if [[ -z "${pwd}" ]]; then
+        pwd=$(_pwd_select "${icon} PassType>" "$MAGENTA")
+    fi
+
+    [[ -z "${pwd}" ]] && exit
+
+    "$PASS" show "$pwd" | {
+        IFS= read -r pass
+        printf %s "$pass"
+    } | $_xdotool
+    exit 0
+}
+
+function _pwd_remove {
+    local pwd="$1"
+    [[ -z "${pwd}" ]] && exit
+    echo "Not implemented yet: '$PASS rm $pwd'"
+    # "$PASS" rm "$pwd"
+    exit 0
+}
+
+function _check_pass {
+    local retcode
+    "$PASS" >/dev/null
+    retcode="$?"
+    return "$retcode"
+}
+
+function _action {
+    if [[ "$#" -ne 2 ]]; then
+        _logerr "action: invalid number of arguments"
+    fi
+
+    local action="$1"
+    local pwd="$2"
+
+    case "$action" in
+    edit) _pwd_edit "$pwd" ;;
+    copy) _pwd_copy "$pwd" ;;
+    otp) _pwd_otp_code "$pwd" ;;
+    typed) _pwd_type "$pwd" ;;
+    show) _pwd_show "$pwd" ;;
+    remove) _pwd_remove "$pwd" ;;
+    *) _logerr "invalid action: '$pwd'" ;;
+    esac
+}
+
+function _select_action {
+    local cmd
+    local pwd="${1:-}"
+    local color="${2:-$BLUE}"
+    local prompt="${ICONS[action]} action> "
+
+    local options=()
+    options+=("${ICONS[copy]} copy")
+    options+=("${ICONS[edit]} edit")
+    options+=("${ICONS[otp]} otp")
+    options+=("${ICONS[show]} show")
+    options+=("${ICONS[typed]} typed")
+    options+=("${ICONS[favorite]} favorite")
+    options+=("${ICONS[remove]} remove")
+
+    cmd=$(_select "$prompt" "$color" "${options[@]}")
+    if (printf '%s\n' "${options[@]}" | grep -x -q "$cmd"); then
+        _action "$(echo "$cmd" | cut -d' ' -f2)" "$pwd"
+    fi
+}
+
+function _menu {
+    local pwd
+    local prompt="${ICONS[prompt]} PassMenu> "
+    pwd=$(_pwd_select)
+    [[ -z "${pwd}" ]] && exit
+
+    _select_action "$pwd"
+}
+
+function _add_pwd {
+    echo "Not implemented yet: '$PASS insert <name>'"
+}
+
 function main {
     _has -v "${DEPS[@]}"
 
@@ -230,14 +334,42 @@ function main {
         _logerr "$errmsg"
     fi
 
+    if _in_terminal && _has fzf; then
+        MENU=fzf
+        MENU_OPTS+=(--tmux "center,50%")
+    else
+        MENU=dmenu
+        MENU_OPTS+=(-l 10)
+    fi
+
     case "$1" in
-    -m | --menu) _menu ;;
-    -e | --edit) _edit_pwd "$@" ;;
-    -l | --list) _list_path ;;
-    -o | --otp) _otp_code ;;
-    -t | --type) _type_pwd "$@" ;;
-    -s | --show) _show_pwd ;;
-    -h | --help) _usage ;;
+    -m | --menu)
+        _menu
+        ;;
+    -a | --add | add)
+        _add_pwd
+        ;;
+    -e | --edit | edit)
+        shift
+        _pwd_edit "$@"
+        ;;
+    -l | --list | list)
+        _pwd_list
+        ;;
+    -o | --otp | otp)
+        shift
+        _pwd_otp_code "$@"
+        ;;
+    -t | --type)
+        _pwd_type
+        ;;
+    -s | --show)
+        shift
+        _pwd_show "$@"
+        ;;
+    -h | --help)
+        _usage
+        ;;
     *) _menu ;;
     esac
 }
