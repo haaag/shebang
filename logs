@@ -3,6 +3,7 @@
 # ╻  ┏━┓┏━╸┏━┓
 # ┃  ┃ ┃┃╺┓┗━┓
 # ┗━╸┗━┛┗━┛┗━┛
+# view/edit logs
 
 set -o nounset
 set -o pipefail
@@ -11,16 +12,19 @@ PROG=$(basename "$0")
 LOGS_PATH=${LOGS_PATH:-$HOME/dcs/log}
 TERMINAL=${TERMINAL:-st}
 LOGS_FILES=("$LOGS_PATH"/*)
+PROMPT="${PROG}> "
 
 declare -a LOGS_NAMES
-
 for log in "${LOGS_FILES[@]}"; do
     name=$(basename "${log}")
     LOGS_NAMES+=("${name}")
 done
 
-log=$(printf '%s\n' "${LOGS_NAMES[@]}" | dmenu -l 10 -p "${PROG}>")
-
-[[ -z "${log}" ]] && exit 1
-
-$TERMINAL -n splogs -c splogs -g 120x30 -e nvim "${LOGS_PATH}/${log}"
+# if not on a terminal, use dmenu
+if [[ ! -t 1 ]]; then
+    log=$(printf '%s\n' "${LOGS_NAMES[@]}" | dmenu -l 10 -p "$PROMPT")
+    [[ -n "${log}" ]] && $TERMINAL -n splogs -c splogs -g 120x30 -e nvim "${LOGS_PATH}/${log}"
+else
+    log=$(printf '%s\n' "${LOGS_NAMES[@]}" | fzf --tmux "center,50%" --no-preview --prompt="$PROMPT")
+    [[ -n "${log}" ]] && "${EDITOR:-nvim}" "${LOGS_PATH}/${log}"
+fi

@@ -1,4 +1,6 @@
-# 💥 #!/bin/sh
+# 💥 #!/bin/bash
+[![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](#)
+[![Bash](https://img.shields.io/badge/Bash-4EAA25?logo=gnubash&logoColor=fff)](#)
 
 - [`brightness`](https://github.com/haaag/shebang/blob/main/brightness) - managing brightness.
 - [`burniso`](https://github.com/haaag/shebang/blob/main/burniso) - burning `iso` images to usb devices using `dd`

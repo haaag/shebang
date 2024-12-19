@@ -47,7 +47,7 @@ _has -v "${DEPS[@]}"
 
 if _in_terminal; then
     MENU="fzf"
-    args+=(--no-preview --prompt="$PROMPT" --cycle)
+    args+=(--no-preview --prompt="$PROMPT" --cycle --tmux "center,65%")
 else
     MENU="dmenu"
     args+=(-l 10 -p "$PROMPT" -i)

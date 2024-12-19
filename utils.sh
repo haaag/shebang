@@ -64,6 +64,8 @@ function separator {
     printf "\n"
 }
 
+# Checks if the script is being run in a terminal, rather than piped to another
+# command.
 function in_terminal {
     # https://stackoverflow.com/questions/911168/how-can-i-detect-if-my-shell-script-is-running-through-a-pipe
     if [[ ! -t 1 ]]; then
@@ -160,7 +162,8 @@ function notification {
     notify-send "$title" "$mesg"
 }
 
-function send_notification {
+# Displays a desktop notification with title, icon, and message.
+function _notifyme {
     local prog
     local mesg="<b>$1</b>"
     local icon="${2:-dialog-warning}"
@@ -168,6 +171,7 @@ function send_notification {
     notify-send -i "$icon" "$prog" "$mesg"
 }
 
+# Prompts the user for confirmation before proceeding.
 function confirm {
     local answer
     echo -n "are you sure you want to continue? ${GRAY}[y/N]:${NC} "
@@ -180,6 +184,8 @@ function confirm {
     esac
 }
 
+# Terminates the script with an error message and exits with non-zero status
+# code.
 function die {
     (($# > 0)) && err "$*"
     exit 1
@@ -192,6 +198,7 @@ function _chdir {
     }
 }
 
+# Verifies the existence of required dependencies before executing a command.
 function has {
     local verbose=false
     if [[ $1 == '-v' ]]; then
@@ -207,6 +214,7 @@ function has {
     done
 }
 
+# Checks if the current terminal is a standard terminal (not pseudo-terminal).
 function _istty {
     if [[ "$(tty)" =~ ^/dev/tty[0-9]+$ ]]; then
         return 0
@@ -235,6 +243,8 @@ function spinner {
     # kill $! 2>/dev/null
 }
 
+# Checks if the target is present in the given array, returns 0 if found, 1 if
+# not
 function _is_available {
     local target=$1
     shift
@@ -247,6 +257,12 @@ function _is_available {
     done
 
     return 1
+}
+
+# Executes a command in the background, discarding both stdout and stderr,
+# using nohup to keep it running after logout
+function detach_cmd {
+    nohup "$@" >"/dev/null" 2>&1 &
 }
 
 # Only in ZSH

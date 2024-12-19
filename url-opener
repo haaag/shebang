@@ -76,7 +76,7 @@ function _choose_action {
     copy) _has -v xclip && echo -e "$arg" | xclip -selection clipboard -r ;;
     mpv) _mpv "$arg" & ;;
     ytmpv) _open_ytmpv "$arg" ;;
-    img) tuiropen "$arg" & ;;
+    img) _has -v tuiropen && tuiropen "$arg" & ;;
     *) exit 1 ;;
     esac
 
