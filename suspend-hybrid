@@ -13,9 +13,9 @@ CURRENT_TIME=$(date +%s)
 LOGGER="${LOGS_PATH:-$HOME/dcs/log}/suspend-hibernate.log"
 
 # AC offline in minutes
-HIBERNATE_DELAY=${HIBERNATE_DELAY:-60}
+HIBERNATE_DELAY=60
 # AC online in minutes
-HIBERNATE_DELAY_CHAR=${HIBERNATE_DELAY_CHAR:-90}
+HIBERNATE_DELAY_CHAR=90
 
 # lock files
 LOCKS=$HOME
@@ -29,56 +29,55 @@ function usage {
     exit 1
 }
 
-function logger {
+function _logger {
     local now
     if [[ ! -f "$LOGGER" ]]; then
-        create_file "$LOGGER"
+        touch "$LOGGER"
     fi
 
     now=$(date '+%F %T')
     echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
 }
 
-function line {
+function _line {
     local w char
     w="79"
     char="-"
     printf "%${w}s\n" | sed "s/ /$char/g"
 }
 
-function remove_file {
+function _file_touch {
     local file="$1"
+    touch "$file"
+    _logger "creating $file"
+    sleep 1
+}
 
+function _file_remove {
+    local file="$1"
     if [[ ! -f "$file" ]]; then
         return
     fi
 
-    rm -f "$file" && logger "removing $file"
+    rm -f "$file" && _logger "removing $file"
     sleep 0.5
 }
 
-function set_timer {
+function _set_timer {
     local time
     time="$1"
-    logger "setting a wake-up timer for $time min"
+    _logger "setting a wake-up timer for $time min"
     # [mode: no] Don’t suspend, only set the RTC wakeup time.
     sudo rtcwake --mode no --date "+${time}min"
-    log_to "$((time * 60))" "$TIMER"
+    _logto "$((time * 60))" "$TIMER"
 }
 
-function disable_timer {
-    logger "disabling the wake-up timer"
+function _disable_timer {
+    _logger "disabling the wake-up timer"
     sudo rtcwake --mode disable
 }
 
-function create_file {
-    local file="$1"
-    touch "$file"
-    logger "creating $file"
-    sleep 1
-}
-
-function battery_status {
+function _battery_status {
     local bat_status bat_charge
     bat_charge=$(cat /sys/class/power_supply/BAT0/capacity)
     bat_status=$(cat /sys/class/power_supply/BAT0/status)
@@ -86,7 +85,7 @@ function battery_status {
     echo "$bat_status::${bat_charge}%"
 }
 
-function is_hibernate_mode {
+function _is_hibernate_mode {
     if [[ ! -f "$WAKEUP_LOCK" ]]; then
         return 1
     fi
@@ -94,7 +93,7 @@ function is_hibernate_mode {
     return 0
 }
 
-function is_ac_online {
+function _is_ac_online {
     # /sys/class/power_supply/AC/online
     # online == 1 | offline == 0
     local status
@@ -106,79 +105,78 @@ function is_ac_online {
     return 0
 }
 
-function quit {
+function _quit {
     local code="$1"
-    line | tee -a "$LOGGER"
+    _line | tee -a "$LOGGER"
     exit "$code"
 }
 
-function title {
+function _title {
     local mode
     mode=$(echo "$1" | tr '[:lower:]' '[:upper:]')
-    logger "::::::::::::MODE $mode:::::::::::::"
+    _logger "::::::::::::MODE $mode:::::::::::::"
 }
 
-function log_to {
+function _logto {
     local data="$1"
     local file="$2"
     echo "$data" >"$file"
 }
 
-function manual_hibernate {
-    create_file "$HIBERNATE_LOCK"
-    logger "setting for manual hibernate..."
-    quit 0
+function _mode_manual_hibernate {
+    _file_touch "$HIBERNATE_LOCK"
+    _logger "setting for manual hibernate..."
+    _quit 0
 }
 
-function suspend_mode {
-    if is_hibernate_mode; then
-        logger "$WAKEUP_LOCK exists"
-        logger "hibernating..."
-        quit 0
+function _mode_suspend {
+    if _is_hibernate_mode; then
+        _logger "$WAKEUP_LOCK exists"
+        _logger "hibernating..."
+        _quit 0
     fi
 
-    if is_ac_online; then
-        logger "AC is online, update timer to $HIBERNATE_DELAY_CHAR min"
+    if _is_ac_online; then
+        _logger "AC is online, update timer to $HIBERNATE_DELAY_CHAR min"
         HIBERNATE_DELAY=$HIBERNATE_DELAY_CHAR
     fi
 
-    log_to "$CURRENT_TIME" "$SUSPEND_LOCK"
-    set_timer "$HIBERNATE_DELAY"
-    logger "entering suspend-mode..."
+    _logto "$CURRENT_TIME" "$SUSPEND_LOCK"
+    _set_timer "$HIBERNATE_DELAY"
+    _logger "entering suspend-mode..."
 }
 
-function resume_mode {
+function _mode_resume {
     # Woke up from hibernate
-    if is_hibernate_mode; then
-        remove_file "$WAKEUP_LOCK"
-        logger "waking up from hibernate-mode...yawn"
-        quit 0
+    if _is_hibernate_mode; then
+        _file_remove "$WAKEUP_LOCK"
+        _logger "waking up from hibernate-mode...yawn"
+        _quit 0
     fi
 
     # Woke up from suspend
     suspend_time=$(cat "$SUSPEND_LOCK")
     timediff=$((CURRENT_TIME - suspend_time))
     hibernate_delay=$(cat "$TIMER")
-    remove_file "$TIMER"
-    logger "timediff = $timediff"
-    logger "hibernate delay $hibernate_delay seconds"
+    _file_remove "$TIMER"
+    _logger "timediff = $timediff"
+    _logger "hibernate delay $hibernate_delay seconds"
 
     # Woke up from timer
     if [[ "$timediff" -ge "$hibernate_delay" ]]; then
-        logger "waking up from timer"
-        logger "setting up for hibernate-mode"
-        remove_file "$SUSPEND_LOCK"
-        create_file "$HIBERNATE_LOCK"
+        _logger "waking up from timer"
+        _logger "setting up for hibernate-mode"
+        _file_remove "$SUSPEND_LOCK"
+        _file_touch "$HIBERNATE_LOCK"
         exit 0
     fi
 
     # Woke up by user activity
-    logger "waking up by user activity"
-    logger "system suspended for $((timediff / 60)) min"
-    remove_file "$SUSPEND_LOCK"
-    disable_timer
-    logger "waking up from suspend-mode...yawn"
-    separator
+    _logger "waking up by user activity"
+    _logger "system suspended for $((timediff / 60)) min"
+    _file_remove "$SUSPEND_LOCK"
+    _disable_timer
+    _logger "waking up from suspend-mode...yawn"
 }
 
 function main {
@@ -188,17 +186,17 @@ function main {
         usage
     fi
 
-    title "$mode"
-    logger "battery::$(battery_status)"
+    _title "$mode"
+    _logger "battery::$(_battery_status)"
 
     case "$mode" in
-    suspend) suspend_mode ;;
-    resume) resume_mode ;;
-    manual) manual_hibernate ;;
+    suspend) _mode_suspend ;;
+    resume) _mode_resume ;;
+    manual) _mode_manual_hibernate ;;
     *) usage ;;
     esac
 
-    quit 0
+    _quit 0
 }
 
 main "$@"

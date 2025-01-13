@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 # ╻ ╻╻┏┓ ┏━╸┏━┓┏┓╻┏━┓╺┳╸┏━╸
 # ┣━┫┃┣┻┓┣╸ ┣┳┛┃┗┫┣━┫ ┃ ┣╸
 # ╹ ╹╹┗━┛┗━╸╹┗╸╹ ╹╹ ╹ ╹ ┗━╸
@@ -20,20 +19,20 @@ DEPS=(zzz ZZZ tee)
 LOCKS=$HOME
 HIBERNATE_LOCK="$LOCKS/hibernate.lock"
 WAKEUP_LOCK="$LOCKS/wakeup.lock"
-SLEEP=5s
+SLEEP=3s
 
 # logs messages with timestamps and script name to the log file.
-function logger {
+function _logger {
     local now
     if [[ ! -f "$LOGGER" ]]; then
-        create_file "$LOGGER"
+        touch "$LOGGER"
     fi
 
     now=$(date '+%F %T')
     echo "[${now}]::[$PROG]::$1" | tee -a "$LOGGER"
 }
 
-function send_notification {
+function _notifyme {
     local prog
     local mesg="<b>$1</b>"
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
@@ -41,99 +40,89 @@ function send_notification {
 }
 
 # prints a separator line in the log file.
-function line {
+function _line {
     local w="79"
     local char="-"
     printf "%${w}s\n" | sed "s/ /$char/g"
 }
 
 # adds a separator line to the log file.
-function separator {
-    line | tee -a "$LOGGER"
+function _separator {
+    _line | tee -a "$LOGGER"
 }
 
 # checks if one of the lockers are seen.
-function seen {
+function _seen {
     local trigger="$1"
     if [[ ! -f "$trigger" ]]; then
         return 1
     fi
 
-    logger "found $trigger"
-    return 0
-}
-
-# checks if the manual lock file exists.
-function is_manual_hibernate {
-    if [[ ! -f "$MANUAL_LOCK" ]]; then
-        return 1
-    fi
-
-    logger "found $MANUAL_LOCK"
+    _logger "found $trigger"
     return 0
 }
 
 # removes a specified lock file and logs the action.
-function remove_lock {
+function _lock_remove {
     local file="$1"
 
     if [[ ! -f "$file" ]]; then
         return
     fi
 
-    logger "removing $file"
+    _logger "removing $file"
     rm -f "$file"
     sleep 0.5
 }
 
 # creates a specified file and logs the action.
-function create_file {
+function _lock_touch {
     local file="$1"
     touch "$file"
-    logger "creating $file"
+    _logger "creating $file"
     sleep 0.5
 }
 
 # checks if the automatic hibernate lock file exists.
-function is_ready_to_hibernate {
+function _is_ready_to_hibernate {
     if [[ ! -f "$HIBERNATE_LOCK" ]]; then
         return 1
     fi
 
-    logger "found $HIBERNATE_LOCK"
+    _logger "found $HIBERNATE_LOCK"
     return 0
 }
 
 # creates a wakeup lock file and triggers the hibernation process
 # using sudo ZZZ.
-function suspend_hybrid {
-    logger "setting up to after wake-up"
-    create_file "$WAKEUP_LOCK"
+function _suspend_hybrid {
+    _logger "setting up to after wake-up"
+    _lock_touch "$WAKEUP_LOCK"
 
-    logger "entering hibernate-mode...sudo ZZZ"
-    separator
+    _logger "entering hibernate-mode...sudo ZZZ"
+    _separator
     sudo ZZZ
 }
 
 function pre_exit {
-    remove_lock "$LOGGER"
+    _lock_remove "$LOGGER"
 }
 
 for dep in "${DEPS[@]}"; do
     if ! command -v "$dep" &>/dev/null; then
-        logger "missing dependency: $dep"
+        _logger "missing dependency: $dep"
         exit 1
     fi
 done
 
-logger "started at $(date)"
+_logger "started at $(date)"
 
 trap pre_exit EXIT SIGTERM
 
 while true; do
-    if seen "$HIBERNATE_LOCK"; then
-        remove_lock "$HIBERNATE_LOCK"
-        suspend_hybrid
+    if _seen "$HIBERNATE_LOCK"; then
+        _lock_remove "$HIBERNATE_LOCK"
+        _suspend_hybrid
     fi
 
     sleep "$SLEEP"
