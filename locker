@@ -9,18 +9,18 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-PROG=$(basename "$0")
-DEPS=(xautolock zzz setsid)
+PROG="${0##*/}"
 SUSPEND_TIME=30
 LOCKER="sudo zzz"
 CMD="xautolock"
+DEPS=(zzz setsid "$CMD")
 
-function log_err {
-    printf "%s: %s\n" "$PROG" "$*"
+function _logerr {
+    printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
 }
 
-function send_notification {
+function _notifyme {
     local prog
     local icon="system-lock-screen-symbolic"
     local mesg="<b>$1</b>"
@@ -28,53 +28,59 @@ function send_notification {
     notify-send -i "$icon" "$prog" "$mesg"
 }
 
-function is_running {
+function _is_running {
     if ! pgrep -x "$CMD" >/dev/null; then
         return 1
     fi
     return 0
 }
 
-function kill_locker {
+function _kill_locker {
     pkill -x "$CMD"
 }
 
-function usage {
+function _usage {
     cat <<-END
-[0;1;34;94m╻[0m  [0;1;34;94m┏━┓┏━╸╻┏[0m [0;1;34;94m┏━╸┏[0;34m━┓[0m
-[0;1;34;94m┃[0m  [0;1;34;94m┃[0m [0;1;34;94m┃┃[0m  [0;34m┣┻┓┣╸[0m [0;34m┣┳┛[0m
-[0;34m┗━╸┗━┛┗━╸╹[0m [0;34m╹┗━╸╹[0;37m┗╸[0m
+Usage: $PROG <timer in minutes> (default: 30m | max: 1 <= mins <= 60)
 
-simple locker with xautolock and zzz
-
-Usage: $PROG <timer in minutes> (default: 30m | max: 60m)
+    Simple timer locker with xautolock and zzz
 END
 }
 
-function main {
-    local timer dep
-    timer="${1:-}"
-
-    for dep in "${DEPS[@]}"; do
-        if ! command -v "$dep" >/dev/null; then
-            local err_msg="'$dep' not found"
-            send_notification "$err_msg"
-            log_err "$err_msg"
+function _has {
+    local c
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "'$c' not found"
+            return 1
         fi
     done
+}
+
+function main {
+    local timer
+    timer="${1:-}"
+
+    _has -v "${DEPS[@]}"
 
     if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
-        usage
+        _usage
         exit
     fi
 
-    if is_running; then
-        kill_locker
+    if _is_running; then
+        _kill_locker
     fi
 
     [[ -n "$timer" ]] && SUSPEND_TIME=$timer
     setsid -f "$CMD" -time "$SUSPEND_TIME" -locker "$LOCKER" -detectsleep
-    send_notification "<i>Setting locker to</i> ${SUSPEND_TIME}m"
+    _notifyme "<i>Setting locker to</i> ${SUSPEND_TIME}m"
 }
 
 main "$@"
