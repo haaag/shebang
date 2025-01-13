@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# ╻ ╻╺┳╸┏┳┓┏━┓╻ ╻
+# ┗┳┛ ┃ ┃┃┃┣━┛┃┏┛
+#  ╹  ╹ ╹ ╹╹  ┗┛
 # usage:
 #   $ ytmpv <URL>
 #
@@ -13,97 +16,212 @@ set -o pipefail
 
 PROG=$(basename "$0")
 DEPS=(mpv curl perl)
-LOGGER="${LOGS_PATH:-$HOME/dcs/log}/${PROG}.log"
 XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 PROMPT="  ${PROG}>"
+DBNAME="ytmpv.db"
+DBPATH="${LOGS_PATH:-$HOME}/$DBNAME"
 
-function log_err_and_exit {
+function _logerr {
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
 }
 
-function send_notification {
+function _notifyme {
     local prog
     local mesg="<b>$1</b>"
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
     notify-send -i youtube "$prog" "$mesg"
 }
 
-function notify_and_exit {
+function _notifyerr {
     local mesg="$1"
-    send_notification "$mesg"
-    log_err_and_exit "$mesg"
+    _notifyme "$mesg"
+    _logerr "$mesg"
 }
 
-function check_dependencies {
-    local cmd
-    for cmd in "${DEPS[@]}"; do
-        if ! command -v "$cmd" >/dev/null; then
-            notify_and_exit "dependency '$cmd' not found"
+function _has {
+    local c
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "'$c' not found"
+            return 1
         fi
     done
 }
 
-function log_mesg {
-    local title="$1"
-    local url="$2"
-    echo "[$(date '+%F %T')]::[$PROG]::${title}::[URL]::${url}" | tee -a "$LOGGER" >/dev/null
+function _create_ytmpv_db {
+    [[ -f "$DBPATH" ]] && _notifyerr "database '$DBPATH' already exists"
+    sqlite3 "$DBPATH" <<EOF
+    CREATE TABLE IF NOT EXISTS youtube (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel TEXT,
+      title TEXT,
+      url TEXT UNIQUE,
+      date TEXT
+    );
+EOF
+
+    _notifyme "database '$DBPATH' created"
 }
 
-function usage {
-    cat <<-_EOF
+function _logger {
+    _has -v sqlite3
+    local channel="$1"
+    local title="$2"
+    local url="$3"
+    [[ ! -f "$DBPATH" ]] && _logerr "database '$DBNAME' not found"
+    [[ -z "$channel" ]] && _notifyerr "no CHANNEL found"
+    [[ -z "$title" ]] && _notifyerr "no TITLE found"
+    [[ -z "$url" ]] && _notifyerr "no URL found"
+
+    sqlite3 "$DBPATH" <<EOF
+INSERT OR IGNORE INTO youtube (channel, title, url, date) VALUES ('$channel', '$title', '$url', datetime('now'));
+EOF
+}
+
+function _usage {
+    cat <<EOF
 Usage: $PROG <URL>
-_EOF
-    exit
+
+    play a video from a given url
+
+Options:
+    -d, db      Create database
+    -h, help    Show this help
+EOF
 }
 
-function get_video_title {
-    local title
+function _get_html_content {
+    local url="$1"
+    [[ -z "$url" ]] && _notifyerr "no URL found"
 
     # checks if is a valid URL
     if ! curl -sL -I "$url" >/dev/null 2>&1; then
-        notify_and_exit "failed to retrieve the URL: '$url'"
+        _notifyerr "failed to retrieve the URL: '$url'"
     fi
 
-    title=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
-    [[ -z "$title" ]] && title="err: failed to extract video title."
+    html_content=$(curl -sL "$url")
+
+    echo "$html_content"
+}
+
+function _extract_title {
+    local html="$1"
+    [[ -z "$html" ]] && _notifyerr "no HTML content found"
+
+    title=$(echo "$html_content" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
+    [[ -z "$title" ]] && title="err: no video title found"
 
     echo "$title"
 }
 
-function playit {
-    local title="$1"
-    local url="$2"
-    [[ -z "$url" ]] && { notify_and_exit "no <URL> found"; }
+function _extract_channel {
+    local html="$1"
+    [[ -z "$html" ]] && _notifyerr "no HTML content found"
 
-    # ${url//youtu.be/yewtu.be}
+    channel_name=$(echo "$html" | perl -l -0777 -ne 'print $1 if /<link itemprop="name" content="(.*?)"/')
+    # channel_name=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /"ownerChannelName":"(.*?)"/si')
+    [[ -z "$channel_name" ]] && channel_name="err: failed to extract channel name."
 
-    log_mesg "$title" "$url"
-    send_notification "$title"
-    setsid -f mpv "$url"
+    echo "$channel_name"
 }
 
-function prompt_and_play {
-    local url title
-    if ! command -v "dmenu" >/dev/null; then
-        notify_and_exit "'dmenu' command not found"
+function _valid_url {
+    local url="$1"
+    [[ -z "$url" ]] && { _notifyerr "no URL found"; }
+
+    if ! curl -sL -I "$url" >/dev/null 2>&1; then
+        return 1
     fi
 
-    url=$(dmenu -h 22 -p "$PROMPT" </dev/null)
-    [[ -z "$url" ]] && { notify_and_exit "no <URL> found"; }
+    return 0
+}
 
-    title="$(get_video_title)"
-    playit "$title" "$url"
+function _get_vid_title_and_channel {
+    local title
+
+    # checks if is a valid URL
+    if ! curl -sL -I "$url" >/dev/null 2>&1; then
+        _notifyerr "failed to retrieve the URL: '$url'"
+    fi
+
+    html_content=$(curl -sL "$url")
+
+    title=$(echo "$html_content" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
+    [[ -z "$title" ]] && title="err: failed to extract video title."
+
+    channel_name=$(echo "$html_content" | perl -l -0777 -ne 'print $1 if /<link itemprop="name" content="(.*?)"/')
+    # channel_name=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /"ownerChannelName":"(.*?)"/si')
+    [[ -z "$channel_name" ]] && channel_name="err: failed to extract channel name."
+
+    echo "$title" "$channel_name"
+}
+
+function _logvideo {
+    local url="$1"
+    [[ -z "$url" ]] && { _notifyerr "no URL found"; }
+
+    local html_content
+    html_content=$(_get_html_content "$url")
+
+    local title channel
+    title=$(_extract_title "$html_content")
+    channel=$(_extract_channel "$html_content")
+
+    _logger "$channel" "$title" "$url"
+    _notifyme "$title @ $channel"
+}
+
+function _play_it {
+    local url="$1"
+    [[ -z "$url" ]] && { _notifyerr "no URL found"; }
+
+    url=$(_clean_url "$url")
+    if _valid_url "$url"; then
+        _logvideo "$url"
+        setsid -f mpv --really-quiet "$url"
+    fi
+}
+
+function _prompt_to_play {
+    if ! _has "dmenu"; then
+        _notifyerr "'dmenu' command not found"
+    fi
+
+    local url
+    url=$(dmenu -h 22 -p "$PROMPT" </dev/null)
+    [[ -z "$url" ]] && { _notifyerr "no URL found"; }
+
+    _play_it "$url"
+}
+
+# clean up URL from youtube-local uri
+function _clean_url {
+    local url="$1"
+    local prefix="http://localhost:8080/"
+    [[ -z "$url" ]] && { _notifyerr "no URL found"; }
+
+    if [[ $url == $prefix* ]]; then
+        url="${url#"$prefix"}"
+    fi
+
+    echo "$url"
 }
 
 function main {
-    local url="$1"
-    check_dependencies
-
+    _has -v "${DEPS[@]}"
+    local url="${1:-$(_has xclip && xclip -o -sel clip)}"
     case "$url" in
-    *youtu.be* | *youtube.com*) playit "$(get_video_title)" "$url" ;;
-    -h | --help) usage ;;
-    *) prompt_and_play ;;
+    -h | --help | help) _usage ;;
+    -d | --db | db) _create_ytmpv_db ;;
+    *youtu.be* | *youtube.com*) _play_it "$url" ;;
+    *) _prompt_to_play ;;
     esac
 }
 
