@@ -9,7 +9,7 @@
 shopt -s nullglob globstar
 
 PROG="${0##*/}"
-DEPS=(notify-send xdotool pass dmenu)
+DEPS=(xdotool pass dmenu)
 PASS=$(which pass)
 
 # vars
@@ -33,6 +33,7 @@ ICONS["favorite"]=""
 ICONS["favorite_added"]=""
 ICONS["action"]=""
 ICONS["remove"]=""
+ICONS["list"]=""
 
 MENU=
 PROMPT="${ICONS[prompt]} PassMenu> "
@@ -46,9 +47,11 @@ YELLOW="#D79921"
 
 function _usage {
     cat <<-EOF
-Usage: $PROG [options]
+Usage: $PROG [Options]
 
-options:
+    pass helper
+
+Options:
     -m, --menu      Select password with menu
     -a, --add       Add new password
     -f, --fav       Choose from favorites
@@ -60,18 +63,6 @@ options:
     -h, --help      Show this help message and exit
 EOF
     exit 0
-}
-
-function _notifyme {
-    local prog
-    local mesg="$1"
-    local cmd=notify-send
-    declare -a args=(-i "dialog-password-symbolic")
-    args+=(-h "string:x-dunst-stack-tag:pass")
-    args+=(-r 888)
-    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
-
-    "$cmd" "${args[@]}" "$prog" "$mesg"
 }
 
 function _logerr {
@@ -100,6 +91,21 @@ function _has {
     done
 }
 
+function _notifyme {
+    if ! _has notify-send; then
+        return
+    fi
+    local prog
+    local mesg="$1"
+    local cmd=notify-send
+    declare -a args=(-i "dialog-password-symbolic")
+    args+=(-h "string:x-dunst-stack-tag:pass")
+    args+=(-r 888)
+    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
+
+    "$cmd" "${args[@]}" "$prog" "$mesg"
+}
+
 function _has_line {
     local pwd="$1"
     local file="$2"
@@ -119,6 +125,8 @@ function _in_terminal {
     return 0
 }
 
+# displays a menu with the given prompt and options, and returns the selected
+# item
 function _select {
     local prompt="${1:-"$PROMPT"}"
     local color="${2:-$BLUE}"
@@ -139,6 +147,20 @@ function _select {
     echo "$item"
 }
 
+# simulates typing the given text using the xdotool command
+function _typed {
+    # TODO: add support for wayland
+    local item="$1"
+    [[ -z "$item" ]] && _logerr "typed: no item given"
+    local _xdotool="xdotool type --clearmodifiers --file -"
+
+    echo "$item" | {
+        IFS= read -r item
+        printf %s "$item"
+    } | $_xdotool
+}
+
+# retrieves a list of all password paths stored in the password store directory
 function _pwd_paths {
     local prefix=${PASSWORD_STORE_DIR-~/.password-store}
     local pwd_files
@@ -148,6 +170,25 @@ function _pwd_paths {
     printf '%s\n' "${pwd_files[@]}"
 }
 
+# find password fullpath in the stored
+function _pwd_get_path {
+    local pwd=$1
+    [[ -z "$pwd" ]] && _logerr "find: no password given"
+
+    local passwords
+    mapfile -t passwords < <(_pwd_paths)
+    for path in "${passwords[@]}"; do
+        if [[ $path == *"$pwd" ]]; then
+            echo "$path"
+            return
+        fi
+    done
+
+    echo
+}
+
+# displays a menu with the available password paths and returns the selected
+# password path
 function _pwd_select {
     local prompt="${1:-"$PROMPT"}"
     local color="${2:-$BLUE}"
@@ -159,6 +200,8 @@ function _pwd_select {
     echo "$pwd"
 }
 
+# edits the specified password in the password store using the configured
+# password editor
 function _pwd_edit {
     local pwd="$1"
     if [[ -z "$pwd" ]]; then
@@ -179,6 +222,7 @@ function _pwd_edit {
     exit 0
 }
 
+# copies password to clipboard
 function _pwd_copy {
     local pwd="$1"
     [[ -z "${pwd}" ]] && _logerr "copy: no password given"
@@ -196,6 +240,7 @@ function _pwd_copy {
     exit 0
 }
 
+# displays the specified password
 function _pwd_show {
     local pwd="$1"
     if [[ -z "$pwd" ]]; then
@@ -211,17 +256,19 @@ function _pwd_show {
     exit 0
 }
 
+# lists passwords in the password store
 function _pwd_list {
     local pwd_path
-    local icon=""
-    pwd_path=$(_pwd_select "${icon} PassList> " "$YELLOW")
+    pwd_path=$(_pwd_select "${ICONS[list]} PassList> " "$YELLOW")
     [[ -z "${pwd_path}" ]] && exit
     echo "$pwd_path"
     exit 0
 }
 
+# retrieves and copies/types otp code
 function _pwd_otp_code {
-    local icon=""
+    # TODO: split me
+    local icon="${ICONS[otp]}"
     local pwd="$1"
     if [[ -z "${pwd}" ]]; then
         pwd=$(_pwd_select "${icon} PassOTP> " "$YELLOW")
@@ -229,35 +276,46 @@ function _pwd_otp_code {
 
     [[ -z "${pwd}" ]] && exit 1
 
-    "$PASS" otp -c "${pwd}"
+    # check if otp exists
+    local _otp
+    _otp="$($PASS otp "$pwd")"
     retcode=$?
-
     if [[ "$retcode" -gt 0 ]]; then
         _logerr "no OTP found for ${pwd}"
     fi
 
-    local mesg
-    mesg="Copied $icon <b>OTP</b> code for <b>${pwd}</b> to clipboard.\n\n"
-    mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
-    _notifyme "$mesg"
+    # which action to perform?
+    local _actions=("${ICONS[copy]} copy" "${ICONS[typed]} typed")
+    local _action
+    _action=$(_select "" "" "${_actions[@]}")
+
+    [[ -z "${_action}" ]] && exit 1
+    _action=$(echo "$_action" | awk '{print $2}')
+
+    if [[ "$_action" = "typed" ]]; then
+        _typed "$($PASS otp "$pwd")"
+    else
+        "$PASS" otp -c "${pwd}"
+        local mesg="Copied <b>OTP</b> code for <b>${pwd}</b> to clipboard.\n\n"
+        mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
+        _notifyme "$mesg"
+    fi
+
     exit 0
 }
 
+# types the password for the specified entry
 function _pwd_type {
     local pwd="$1"
-    local icon=" "
-    local _xdotool="xdotool type --clearmodifiers --file -"
-
     if [[ -z "${pwd}" ]]; then
-        pwd=$(_pwd_select "${icon} PassType>" "$MAGENTA")
+        pwd=$(_pwd_select "${ICONS[typed]} PassType>" "$MAGENTA")
     fi
 
     [[ -z "${pwd}" ]] && exit
 
-    "$PASS" show "$pwd" | {
-        IFS= read -r pass
-        printf %s "$pass"
-    } | $_xdotool
+    local item
+    item=$("$PASS" show "$pwd")
+    _typed "$item"
     exit 0
 }
 
@@ -269,6 +327,8 @@ function _pwd_remove {
     exit 0
 }
 
+# checks if the password-store command (pass) is available and functioning
+# correctly
 function _check_pass {
     local retcode
     "$PASS" >/dev/null
@@ -276,6 +336,7 @@ function _check_pass {
     return "$retcode"
 }
 
+# performs password action
 function _action {
     if [[ "$#" -ne 2 ]]; then
         _logerr "action: invalid number of arguments"
@@ -296,11 +357,12 @@ function _action {
     esac
 }
 
+# displays password action menu
 function _select_action {
     local cmd
     local pwd="${1:-}"
     local color="${2:-$BLUE}"
-    local prompt="${ICONS[action]} action> "
+    local prompt="${ICONS[action]} ${pwd}> "
 
     local options=()
     options+=("${ICONS[copy]} copy")
@@ -321,6 +383,7 @@ function _select_action {
     fi
 }
 
+# manages password favorites
 function _fav_add {
     local pwd="$1"
     [[ -z "${pwd}" ]] && _logerr "fav: no password given"
@@ -336,6 +399,7 @@ function _fav_add {
     _logme "password '${pwd}' added to favorites"
 }
 
+# removes password from favorites
 function _fav_remove {
     local pwd="$1"
     [[ -z "${pwd}" ]] && exit
@@ -354,6 +418,7 @@ function _fav_remove {
     _logme "password '${pwd}' removed from favorites"
 }
 
+# displays favorite passwords
 function _fav_pwd {
     local pwd
     [[ -f "$FAVORITES" ]] || _logerr "fav: file not found"
@@ -365,17 +430,24 @@ function _fav_pwd {
     _select_action "$pwd"
 }
 
+# displays password menu
 function _menu {
     local pwd
     local prompt="${ICONS[prompt]} PassMenu> "
-    pwd=$(_pwd_select)
-    [[ -z "${pwd}" ]] && exit
+    if [[ -n "$1" ]]; then
+        pwd=$(_pwd_get_path "$1")
+        [[ -z "${pwd}" ]] && _logerr "password '$1' not found"
+    else
+        pwd=${1:-$(_pwd_select)}
+    fi
 
+    [[ -z "${pwd}" ]] && exit 1
     _select_action "$pwd"
 }
 
+# adds a password to the password store
 function _add_pwd {
-    echo "Not implemented yet: '$PASS insert <name>'"
+    echo "not implemented yet: '$PASS insert <name>'"
 }
 
 function main {
@@ -396,7 +468,7 @@ function main {
 
     case "$1" in
     -m | --menu)
-        _menu
+        _menu "$1"
         ;;
     -a | --add | add)
         _add_pwd
@@ -426,7 +498,7 @@ function main {
     -h | --help)
         _usage
         ;;
-    *) _menu ;;
+    *) _menu "$1" ;;
     esac
 
 }
