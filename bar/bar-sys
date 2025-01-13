@@ -44,7 +44,8 @@ function get_interface {
 }
 
 function get_icons {
-    icons=(                 )
+    declare -a icons=()
+    icons+=(                 )
     icons+=(                )
     icons+=(          )
     icons+=(            )
@@ -169,6 +170,7 @@ function main {
     programs["signal-desktop"]="" # ""
     programs["dragon"]=""
     programs["telegram"]="" # ""
+    programs["share-files"]=""
     # programs["tidal-hifi"]=""
     # programs["ytlocal"]=""
     # programs["xbps-install"]=""

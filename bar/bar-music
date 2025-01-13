@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+# script for displaying mpd/tidal-hifi status
+#
+# output:
+#  artist - track 00:00/00:00
+
+set -euo pipefail
+
+PLAYING="" # ""
+
+function _logerr {
+    printf "%s: %s\n" "${0##*/}" "$*" >&2
+    exit 1
+}
+
+function _is_running {
+    local cmd="$1"
+
+    case "$cmd" in
+    "mpd") pgrep -f "$cmd" >/dev/null ;;
+    "tidal-hifi") curl -s http://localhost:47836/current >/dev/null ;;
+    *) ;;
+    esac
+}
+
+function _mpd_status {
+    local status artist track pos dur
+    status=$(mpc status | sed -n 2p | awk '{print $1;}')
+    if [[ "$status" = "[paused]" ]]; then
+        return
+    else
+        status=$PLAYING
+    fi
+
+    artist=$(mpc current -f %artist%)
+    track=$(mpc current -f %title%)
+    pos=$(mpc status | grep "%)" | awk '{ print $3 }' | awk -F/ '{ print $1 }')
+    dur=$(mpc current -f %time%)
+
+    printf "%s %s - %s %s/%s" "$status" "$artist" "$track" "$pos" "$dur"
+}
+
+function _tidal_status {
+    if ! command -v jq >/dev/null; then
+        _logerr "jq not found"
+    fi
+
+    local json track artist status pos dur
+    local host="http://localhost:47836"
+    json=$(curl -s "$host/current")
+    [[ -z "$json" ]] && _logerr "err fetching tidal-hifi status"
+
+    status=$(echo "$json" | jq -r '.status')
+    if [[ "$status" = "paused" ]]; then
+        return
+    else
+        status=$PLAYING
+    fi
+
+    track=$(echo "$json" | jq -r '.title')
+    artist=$(echo "$json" | jq -r '.artist')
+    pos=$(echo "$json" | jq -r '.current')
+    dur=$(echo "$json" | jq -r '.duration')
+
+    printf "%s %s - %s %s/%s" "$status" "$artist" "$track" "$pos" "$dur"
+}
+
+function main {
+    if _is_running "tidal-hifi"; then
+        _tidal_status
+    elif _is_running "mpd"; then
+        _mpd_status
+    fi
+}
+
+main
