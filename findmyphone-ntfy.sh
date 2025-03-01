@@ -5,21 +5,21 @@ PROG="${0##*/}"
 # shellcheck source=/dev/null
 [[ -f "${PRIVATE_ROOT:-}/ntfy.sh" ]] && . "$PRIVATE_ROOT/ntfy.sh"
 
-function send_notification {
+function _notifyme {
     local prog
     local mesg="<b>$1</b>"
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
     notify-send -i "preferences-system-notifications" "$prog" "$mesg"
 }
 
-function log_err {
+function _logerr {
     local msg="$1"
-    send_notification "$msg"
+    _notifyme "$msg"
     printf "%s: %s\n" "$PROG" "$msg" >&2
     exit 1
 }
 
-[[ -z "$VOID_TOPIC" ]] && log_err "ntfy <i>topic</i> can not be empty"
+[[ -z "$VOID_TOPIC" ]] && _logerr "ntfy <i>topic</i> can not be empty"
 
 notify-ntfy \
     --topic="${VOID_TOPIC}" \

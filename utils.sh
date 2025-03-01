@@ -162,7 +162,7 @@ function notification {
     notify-send "$title" "$mesg"
 }
 
-# Displays a desktop notification with title, icon, and message.
+# displays a desktop notification with title, icon, and message.
 function _notifyme {
     local prog
     local mesg="<b>$1</b>"
@@ -171,7 +171,7 @@ function _notifyme {
     notify-send -i "$icon" "$prog" "$mesg"
 }
 
-# Prompts the user for confirmation before proceeding.
+# prompts the user for confirmation before proceeding.
 function confirm {
     local answer
     echo -n "are you sure you want to continue? ${GRAY}[y/N]:${NC} "
@@ -184,7 +184,7 @@ function confirm {
     esac
 }
 
-# Terminates the script with an error message and exits with non-zero status
+# terminates the script with an error message and exits with non-zero status
 # code.
 function die {
     (($# > 0)) && err "$*"
@@ -198,7 +198,7 @@ function _chdir {
     }
 }
 
-# Verifies the existence of required dependencies before executing a command.
+# verifies the existence of required dependencies before executing a command.
 function has {
     local verbose=false
     if [[ $1 == '-v' ]]; then
@@ -214,7 +214,7 @@ function has {
     done
 }
 
-# Checks if the current terminal is a standard terminal (not pseudo-terminal).
+# checks if the current terminal is a standard terminal (not pseudo-terminal).
 function _istty {
     if [[ "$(tty)" =~ ^/dev/tty[0-9]+$ ]]; then
         return 0
@@ -259,12 +259,22 @@ function _is_available {
     return 1
 }
 
-# Executes a command in the background, discarding both stdout and stderr,
+# executes a command in the background, discarding both stdout and stderr,
 # using nohup to keep it running after logout
 function detach_cmd {
     nohup "$@" >"/dev/null" 2>&1 &
 }
 
-# Only in ZSH
+# hide the cursor
+function hide_cursor {
+    printf "\033[?25l"
+}
+
+# show the cursor
+function show_cursor {
+    printf "\033[?25h"
+}
+
+# ONLY IN ZSH
 print -P "%F{160}▓▒░ The clone has failed.%f%b"
 print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b"

@@ -134,6 +134,7 @@ function _install {
 
     mapfile -t fzf_opts < <(_get_fzf_defaults "80")
     fzf_opts+=(--multi)
+    fzf_opts+=(--query="$query")
     fzf_opts+=(--prompt="${ICONS[install]} Packages> ")
     fzf_opts+=(--marker=" ")
     fzf_opts+=(--preview='xbps-query -R {}')

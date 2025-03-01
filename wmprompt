@@ -8,13 +8,13 @@ OPTS=(" lock" "⏾ suspend" " hibernate" " logout")
 OPTS+=(" reboot" " poweroff" " restartwm" " displayoff")
 XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-dwm}
 
-function lod_err_exit {
+function _logerr {
     notify-send "$PROG" "$*"
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
 }
 
-function print_stdout {
+function _logme {
     printf "%s: %s\n" "$PROG" "$*"
 }
 
@@ -23,22 +23,46 @@ function main {
 
     for cmd in "${DEPS[@]}"; do
         if ! command -v "$cmd" >/dev/null; then
-            lod_err_exit "'$cmd' command not found."
+            _logerr "'$cmd' command not found."
         fi
     done
 
     uptime=$(uptime -p | sed -e 's/up //g')
-    chosen=$(printf "%s\n" "${OPTS[@]}" | dmenu -i -p "$(hostname): $uptime")
+    chosen=$(printf "%s\n" "${OPTS[@]}" | dmenu -i -p " $(hostname): $uptime")
 
     case "$chosen" in
-    *lock) print_stdout "locking screen with slock" && slock ;;
-    *suspend) print_stdout "suspending system with zzz" && sudo zzz ;;
-    *hibernate) print_stdout "hibernating system with ZZZ" && suspend-hybrid manual ;;
-    *logout) print_stdout "logging out" && pkill -x Xorg ;;
-    *restartwm) print_stdout "restarting dwm" && pkill -x "$XDG_CURRENT_DESKTOP" ;;
-    *reboot) print_stdout "rebooting system" && sudo -A reboot ;;
-    *poweroff) print_stdout "powering off system" && sudo -A poweroff ;;
-    *displayoff) print_stdout "powering off display" && xset dpms force off ;;
+    *lock)
+        _logme "locking screen with slock"
+        slock
+        ;;
+    *suspend)
+        _logme "suspending system with zzz"
+        sudo zzz
+        ;;
+    *hibernate)
+        _logme "hibernating system with ZZZ"
+        suspend-hybrid manual
+        ;;
+    *logout)
+        _logme "logging out"
+        pkill -x Xorg
+        ;;
+    *restartwm)
+        _logme "restarting dwm"
+        pkill -x "$XDG_CURRENT_DESKTOP"
+        ;;
+    *reboot)
+        _logme "rebooting system"
+        sudo -A reboot
+        ;;
+    *poweroff)
+        _logme "powering off system"
+        sudo -A poweroff
+        ;;
+    *displayoff)
+        _logme "powering off display"
+        xset dpms force off
+        ;;
     *) exit ;;
     esac
 }
