@@ -88,6 +88,7 @@ DEFAULTS_APPS["video/quicktime"]="video.desktop"
 DEFAULTS_APPS["video/webm"]="video.desktop"
 DEFAULTS_APPS["video/x-flv"]="video.desktop"
 DEFAULTS_APPS["video/x-ms-wmv"]="video.desktop"
+DEFAULTS_APPS["video/x-matroska"]="video.desktop"
 DEFAULTS_APPS["video/x-msvideo"]="video.desktop"
 # torrent
 DEFAULTS_APPS["application/x-bittorrent"]="torrent.desktop"
@@ -131,6 +132,14 @@ function print_header {
         print_row "MIME Type" "Desktop Entry" "Current" "Status"
         pline
     fi
+}
+
+function hide_cursor {
+    printf "\033[?25l"
+}
+
+function show_cursor {
+    printf "\033[?25h"
 }
 
 function spinner {
@@ -180,6 +189,12 @@ function get_entry {
 
 function query_entry {
     xdg-mime query filetype "$1"
+}
+
+function query_file {
+    local type
+    type=$(xdg-mime query filetype "$1")
+    xdg-mime query default "$type"
 }
 
 function set_entry {
@@ -235,6 +250,7 @@ function check_entries {
         spinner "$mesg"
     fi
 
+    hide_cursor
     print_header
     local mime_type entry current
     for mime_type in "${!DEFAULTS_APPS[@]}"; do
@@ -254,11 +270,12 @@ function check_entries {
     fi
 
     if [[ "${#NOTSET[@]}" -gt 0 ]]; then
+        show_cursor
         handle_notset
         return
     fi
 
-    logme "all ${#DEFAULTS_APPS[@]} entries setted"
+    logme "all ${#DEFAULTS_APPS[@]} entries set"
 }
 
 function usage {
@@ -269,11 +286,14 @@ Usage: $PROG [-v] <COMMAND>
 
 Command:
     -g <MIME-type>  Query default desktop entry
-    -e <file>       Query filetype mime-type
+    -e <FILE>       Query filetype mime-type
+    -f <FILE>       Query default desktop entry
     -c              Show current state
     -v              Verbose output
 _EOF
 }
+
+trap 'show_cursor' EXIT SIGTERM
 
 function main {
     if [[ "$#" -le 0 ]]; then
@@ -284,13 +304,14 @@ function main {
         err_exit "xdg-mime not found"
     fi
 
-    while getopts "ce:g:uv" flag; do
+    while getopts "ce:g:f:uv" flag; do
         case ${flag} in
         v) VERBOSE=true ;;
         c) check_entries ;;
         e) shift && query_entry "$1" ;;
         g) shift && get_entry "$1" ;;
         u) update_entries ;;
+        f) shift && query_file "$1" ;;
         *) usage && exit 1 ;;
         esac
     done
