@@ -6,6 +6,10 @@
 #                      
 icon_up=""
 icon_down=""
+monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+if [[ "$monitors" -eq 1 ]]; then
+    exit
+fi
 
 function update {
     sum=0

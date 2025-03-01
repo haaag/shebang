@@ -8,6 +8,11 @@
 #      
 ICON=" "
 
+monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+if [[ "$monitors" -eq 1 ]]; then
+    exit
+fi
+
 # The bash shell arithmetic expression ((...)) can't handle floating point.
 [[ -z "$(which bc)" ]] && echo "bc command not found." && exit 1
 

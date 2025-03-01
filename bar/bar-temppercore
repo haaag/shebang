@@ -7,18 +7,21 @@
 # icons:     
 PROG=$(basename "$0")
 TARGET="k10temp-pci-00c3"
-WARN_ICON="🔥" # ""
-MAX_TEMP=90
+WARN_ICON="🔥"
+MAX_TEMP=95
+NOTIFYID=888
+WARN_NOTIFIED="/tmp/${PROG}-high"
 
-function send_notification {
+function _notify {
     local msg="$1"
     export DISPLAY=":0"
     declare -a notify_args=(-h string:x-dunst-stack-tag:temppercore)
     notify_args+=(-i "cpu" -u critical)
+    notify_args+=(-r "$NOTIFYID")
     notify-send "${notify_args[@]}" "$PROG" "$msg"
 }
 
-function get_icon {
+function _get_icon {
     local temp="$1"
     local icon
     if [[ "${temp}" -ge 20 && "${temp}" -le 40 ]]; then
@@ -38,19 +41,27 @@ function get_icon {
     echo "${icon}"
 }
 
-function cpu_temp {
+function _cpu_tempcore {
     local temp_str temp_int icon
     temp_str=$(sensors "${TARGET}" | grep 'Tctl' | awk '{print $2}' | sed s/+//)
     temp_int=${temp_str%.*}
-    icon=$(get_icon "${temp_int}")
+    icon=$(_get_icon "${temp_int}")
 
     if [[ "$temp_int" -ge "$MAX_TEMP" ]]; then
-        send_notification "${icon}${temp_str} is too high"
+        _notify "${icon}${temp_str} is too high"
+        if [[ ! -e "$WARN_NOTIFIED" ]]; then
+            touch "$WARN_NOTIFIED"
+        fi
     fi
 
     printf "%s" "${SEP1:-}"
     printf "%s %s\n" "$icon" "$temp_str"
     printf "%s" "${SEP2:-}"
+
+    if [[ -e "$WARN_NOTIFIED" ]] && [[ "$temp_int" -lt "$MAX_TEMP" ]]; then
+        dunstctl close "$NOTIFYID"
+        rm "$WARN_NOTIFIED"
+    fi
 }
 
-cpu_temp
+_cpu_tempcore

@@ -7,6 +7,11 @@
 
 set -o pipefail
 
+monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+if [[ "$monitors" -eq 1 ]]; then
+    exit
+fi
+
 function main {
     if ! pgrep -f "transmission-daemon" >/dev/null; then
         return

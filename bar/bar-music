@@ -6,8 +6,13 @@
 #  artist - track 00:00/00:00
 
 set -euo pipefail
+monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+if [[ "$monitors" -eq 1 ]]; then
+    exit
+fi
 
-PLAYING="" # ""
+PLAYING=""
+# PLAYING=""
 
 function _logerr {
     printf "%s: %s\n" "${0##*/}" "$*" >&2
@@ -38,7 +43,7 @@ function _mpd_status {
     pos=$(mpc status | grep "%)" | awk '{ print $3 }' | awk -F/ '{ print $1 }')
     dur=$(mpc current -f %time%)
 
-    printf "%s %s - %s %s/%s" "$status" "$artist" "$track" "$pos" "$dur"
+    printf "%s %s - %s %s/%s\n" "$status" "$artist" "$track" "$pos" "$dur"
 }
 
 function _tidal_status {
@@ -63,7 +68,7 @@ function _tidal_status {
     pos=$(echo "$json" | jq -r '.current')
     dur=$(echo "$json" | jq -r '.duration')
 
-    printf "%s %s - %s %s/%s" "$status" "$artist" "$track" "$pos" "$dur"
+    printf "%s %s - %s %s/%s\n" "$status" "$artist" "$track" "$pos" "$dur"
 }
 
 function main {

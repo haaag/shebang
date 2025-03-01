@@ -49,10 +49,11 @@ function get_icons {
     icons+=(                )
     icons+=(          )
     icons+=(            )
-    icons+=(                    )
+    icons+=(                   )
     icons+=(               )
-    icons+=(              )
+    icons+=(             )
     icons+=(               )
+    icons+=(     )
 }
 
 function is_bluetooth_on {
@@ -165,12 +166,13 @@ function main {
     programs["bitwarden"]=""
     programs["jellyfin"]=""
     programs["galculator"]=""
-    programs["newsboat"]="" # "" # "" ""
-    programs["mpv"]="" #  # 
+    programs["newsboat"]=""       # "" # "" ""
+    programs["mpv"]=""            #  # 
     programs["signal-desktop"]="" # ""
     programs["dragon"]=""
     programs["telegram"]="" # ""
     programs["share-files"]=""
+    # programs["obs"]=""
     # programs["tidal-hifi"]=""
     # programs["ytlocal"]=""
     # programs["xbps-install"]=""

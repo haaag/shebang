@@ -7,8 +7,13 @@
 #
 # output: "[ICON Fri, DD MMM]"
 #      
+
 ICON=" "
+monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+if [ "$monitors" -eq 1 ]; then
+    d=$(date "+%d %b")
+else
+    d=$(date "+%a %d %b")
+fi
 
-# fmt_date="$(date "+%a %d-%m")"
-
-printf "%s%s %s%s\n" "${SEP:-}" "$ICON" "$(date "+%a %d %b")" "${SEP:-}"
+printf "%s%s %s%s\n" "${SEP:-}" "$ICON" "$d" "${SEP:-}"
