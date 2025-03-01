@@ -95,7 +95,7 @@ function main {
     _cleanup
 
     case "$1" in
-    *png | *jpg | *jpe | *jpeg)
+    *png | *jpg | *jpe | *jpeg | *preview.redd.it*)
         _has -v nsxiv
         curl -sL "$1" >"$DIR/$(echo "$1" | sed "s/.*\///;s/%20/ /g")" && nsxiv -a "$DIR/$(echo "$1" | sed "s/.*\///;s/%20/ /g")" >/dev/null 2>&1 &
         ;;
@@ -114,6 +114,9 @@ function main {
     *youtu.be* | *youtube.com/watch* | *youtube.com/playlist* | *youtube.com/shorts*)
         _has -v ytmpv
         setsid -f ytmpv "$1"
+        ;;
+    *github.com*)
+        setsid -f xdg-open "$1"
         ;;
     *) _choose_action "$1" ;;
     esac
