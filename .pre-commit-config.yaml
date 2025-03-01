@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.22.1
+    rev: v8.24.0
     hooks:
       - id: gitleaks
   - repo: https://github.com/shellcheck-py/shellcheck-py
@@ -27,10 +27,10 @@ repos:
         types: [shell]
   # Spell
   - repo: https://github.com/crate-ci/typos
-    rev: dictgen-v0.3.1
+    rev: v1.30.0
     hooks:
       - id: typos
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell
