@@ -8,6 +8,8 @@
 
 shopt -s nullglob globstar
 
+set -eou pipefail
+
 PROG="${0##*/}"
 DEPS=(xdotool pass dmenu)
 PASS=$(which pass)
@@ -135,13 +137,15 @@ function _select {
     shift
     local items=("$@")
 
-    if [[ "$MENU" == "dmenu" ]]; then
-        MENU_OPTS+=(-p "$prompt")
-        MENU_OPTS+=(-sb "$color")
-    else
+    if [[ "$MENU" == "fzf" ]]; then
         MENU_OPTS+=(--prompt="$prompt")
         MENU_OPTS+=(--color="prompt:$color")
+    else
+        MENU_OPTS+=(-p "$prompt")
+        MENU_OPTS+=(-sb "$color")
     fi
+
+    _has -v "$MENU"
 
     item=$(printf "%s\n" "${items[@]}" | "$MENU" "${MENU_OPTS[@]}")
     echo "$item"
@@ -211,7 +215,7 @@ function _pwd_edit {
     [[ -z $pwd ]] && exit
 
     if _in_terminal; then
-        if [[ -n "$TMUX" ]]; then
+        if [[ -n "${TMUX:-}" ]]; then
             tmux display-popup -E -w 65% -h 65% "$PASS edit $pwd"
         else
             "$PASS" edit "$pwd"
@@ -234,7 +238,7 @@ function _pwd_copy {
     fi
 
     local mesg
-    mesg="Copied $icon <b>${pwd}</b> to clipboard.\n\n"
+    mesg="Copied <b>${pwd}</b> to clipboard.\n\n"
     mesg+="<i>Will clear in <b>${PASSWORD_STORE_CLIP_TIME}</b> seconds.</i>"
     _notifyme "$mesg"
     exit 0
@@ -269,7 +273,7 @@ function _pwd_list {
 function _pwd_otp_code {
     # TODO: split me
     local icon="${ICONS[otp]}"
-    local pwd="$1"
+    local pwd="${1:-}"
     if [[ -z "${pwd}" ]]; then
         pwd=$(_pwd_select "${icon} PassOTP> " "$YELLOW")
     fi
@@ -461,12 +465,16 @@ function main {
     if _in_terminal && _has fzf; then
         MENU=fzf
         MENU_OPTS+=(--tmux "center,50%")
-    else
+    elif _has rofi; then
+        MENU=rofi
+        MENU_OPTS+=(-dmenu)
+        MENU_OPTS+=(-l 10)
+    elif _has dmenu; then
         MENU=dmenu
         MENU_OPTS+=(-l 10)
     fi
 
-    case "$1" in
+    case "${1:-}" in
     -m | --menu)
         _menu "$1"
         ;;
@@ -498,7 +506,7 @@ function main {
     -h | --help)
         _usage
         ;;
-    *) _menu "$1" ;;
+    *) _menu "${1:-}" ;;
     esac
 
 }
