@@ -4,7 +4,7 @@
 #
 # Output: [ICON 10%]
 
-ICON=""
+ICON="" # 
 
 function dwm_cpu_old {
     cpu=$(top -bn1 | grep Cpu | awk '{print $2}')

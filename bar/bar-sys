@@ -27,7 +27,7 @@ function get_interface {
 
     declare -A interfaces
     interfaces["$ether"]="" # "" # ""
-    interfaces["$wlan"]=""  #"" # ""
+    interfaces["$wlan"]="" # ""  #"" # ""
 
     local exclude="loopback"
     status=$(nmcli device status | grep "$ether\|$wlan")
@@ -51,20 +51,23 @@ function get_icons {
     icons+=(            )
     icons+=(                   )
     icons+=(               )
-    icons+=(             )
-    icons+=(               )
-    icons+=(     )
+    icons+=(             )
+    icons+=(                )
+    icons+=(         )
+    icons+=(               )
 }
 
 function is_bluetooth_on {
+    local active=""
+    local inactive=""
     if bluetoothctl show | grep -q "Powered: yes"; then
         info=$(bluetoothctl info)
         if [[ $info == *"Missing"* ]]; then
-            printf "%s" ""
+            printf "%s" "$inactive"
             return
         fi
 
-        printf " %s" ""
+        printf "%s" "$active"
         return
     fi
 }
