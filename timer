@@ -5,14 +5,16 @@
 #  ╹ ╹╹ ╹┗━╸╹┗╸
 # set timers
 
+set -eou pipefail
+
 PROG="${0##*/}"
-DURATION="$1"
-TIMER_NAME="${2:-Timer}"
+DURATION="${1:-}"
+TIMER_NAME="${2:-}"
 ICON=""
 DEPS=(notify-send dmenu mpv)
 
 # files
-SOUND="$HOME/bin/assets/alarm-beepbeep.mp3"
+SOUND="$HOME"/bin/assets/alarm-beepbeep.mp3
 PIDFILE="/tmp/$PROG.pid"
 TIMEFILE="/tmp/$PROG.time"
 MPVPID="/tmp/$PROG.mpv"
@@ -56,7 +58,9 @@ function _has {
 
 function _checkdeps {
     _has -v "${DEPS[@]}"
-    [[ ! -e "$SOUND" ]] && _logerr "timer file not found: $SOUND"
+    if [[ ! -e "$SOUND" ]]; then
+        _logerr "timer file not found: $SOUND"
+    fi
 }
 
 function pre_exit {
@@ -81,6 +85,10 @@ Options:
 EOF
 }
 
+function _get_random_str {
+    echo "$RANDOM" | base64 | head -c5 | tr '[:upper:]' '[:lower:]'
+}
+
 function _interpret_time {
     local input last_char time
     if [[ ${#1} -eq 1 ]]; then
@@ -99,28 +107,23 @@ function _interpret_time {
     elif [[ "$last_char" == "h" ]]; then
         time=$((time * 60 * 60))
     else
-        exit 130
+        _logerr "invalid input: $input"
     fi
 
     echo "$time"
 }
 
 function _cancel_timer {
-    local pid
-
     if [[ -e "$MPVPID" ]]; then
-        local mpvpid
-        mpvpid=$(cat "$MPVPID")
-        kill -9 "$mpvpid" &>/dev/null
+        kill -9 "$(cat "$MPVPID")" &>/dev/null
     fi
 
     if [[ ! -e "$PIDFILE" ]]; then
         _logerr "no timer found"
     fi
 
-    pid=$(cat "$PIDFILE")
-    _logme "timer with pid=$pid cancelled"
-    kill -9 "$pid" &>/dev/null
+    _logme "timer '$TIMER_NAME' cancelled"
+    kill -9 "$(cat "$PIDFILE")" &>/dev/null
 
     pre_exit
 }
@@ -130,8 +133,7 @@ function _save_pid {
 }
 
 function _save_timestamp {
-    local time="$1"
-    echo "$time" | tee "$TIMEFILE" >/dev/null
+    echo "$1" | tee "$TIMEFILE" >/dev/null
 }
 
 function _get_timestamp {
@@ -191,23 +193,33 @@ function _show_status {
 }
 
 function _sound_the_alarm {
-    _notifyme "timer with duration=$duration"
+    _notifyme "timer <b>'$TIMER_NAME'</b> is up!!!"
     mpv "$SOUND" --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
     mpv_pid=$!
     echo "$mpv_pid" >"$MPVPID"
 }
 
+function _validate_input {
+    local input="$1"
+    if [[ $input =~ [0-9] ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 function _set_timer {
-    trap pre_exit SIGTERM
+    trap pre_exit EXIT SIGTERM SIGINT
 
     local duration="$1"
+    local name="$2"
     local current current_time
     current=$(date +%s)
     duration=$(_interpret_time "$duration")
     current_time=$((current + duration))
     _save_timestamp "$current_time"
 
-    _notifyme "setting timer for $(_show_status)"
+    _notifyme "setting $(_show_status) timer for '$name'"
 
     while true; do
         current=$(date +%s)
@@ -225,9 +237,8 @@ function _set_timer {
 
 function _get_input {
     local data
-    local icon=""
     local prompt="$1"
-    data=$(: | dmenu -i -p "$icon $prompt")
+    data=$(: | dmenu -i -p "$ICON $prompt")
     echo "$data"
 }
 
@@ -250,11 +261,7 @@ function parse_and_exit {
     cancel | stop | kill)
         _cancel_timer
         ;;
-    +*)
-        _update_time "$@"
-        exit 0
-        ;;
-    -*)
+    +* | -*)
         _update_time "$@"
         exit 0
         ;;
@@ -271,9 +278,13 @@ function main {
     fi
 
     [[ -z "$DURATION" ]] && exit 1
+    if ! _validate_input "$DURATION"; then
+        _logerr "invalid duration: $DURATION"
+    fi
 
-    local pid=$$
-    _save_pid "$pid"
+    [[ -z "$TIMER_NAME" ]] && TIMER_NAME="${DURATION}-$(_get_random_str)"
+
+    _save_pid "$$" "$TIMER_NAME"
     _set_timer "$DURATION" "$TIMER_NAME"
 }
 
