@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+# ╺┳╸┏┳┓╻ ╻╻ ╻┏━┓   ╻  ┏━┓┏━┓╺┳┓┏━╸┏━┓
+#  ┃ ┃┃┃┃ ┃┏╋┛┣━┛╺━╸┃  ┃ ┃┣━┫ ┃┃┣╸ ┣┳┛
+#  ╹ ╹ ╹┗━┛╹ ╹╹     ┗━╸┗━┛╹ ╹╺┻┛┗━╸╹┗╸
+# load tmux sessions
+
+set -eou pipefail
+
+PROG="${0##*/}"
+DEPS=(tmux fzf tmuxp)
+ROOT="${XDG_CONFIG_HOME:-$HOME/.config}/tmuxp"
+
+for cmd in "${DEPS[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        printf "%s: %s\n" "$PROG" "'$cmd' not found"
+        exit 1
+    fi
+done
+
+declare -A ICONS
+ICONS[edit]=" edit"
+ICONS["load-detach"]=" load-detach"
+ICONS["load-switch"]=" load-switch"
+ICONS["load-attach"]=" load-attach"
+ICONS[attach]=" attach"
+ICONS[switch]=" switch"
+ICONS[running]=""
+ICONS[prompt]=""
+ICONS[pointer]=""
+
+FZFARGS=(--tmux --no-preview --pointer="${ICONS[pointer]}" --color=header:italic:gray --reverse)
+FZFARGS+=(--tac --info=inline-right --layout=default --color=prompt:bold)
+FZFARGS+=(--border-label=" tmuxp " --border)
+
+mapfile -t FILENAMES < <(find "$ROOT/" -type f -name "*.yaml" -exec basename {} .yaml \;)
+mapfile -t sessions_running < <(tmux list-sessions 2>/dev/null | awk -F':' '{print $1}')
+for i in "${!FILENAMES[@]}"; do
+    if [[ " ${sessions_running[*]} " =~ ${FILENAMES[i]} ]]; then
+        FILENAMES[i]="${FILENAMES[i]} ${ICONS[running]}"
+    fi
+done
+
+filename=$(printf "%s\n" "${FILENAMES[@]}" | fzf "${FZFARGS[@]}" \
+    --prompt="${ICONS[prompt]} session> " \
+    --header="${ICONS[running]} running session" --header-label-pos=bottom)
+[[ -z "$filename" ]] && exit 1
+filename="${filename/ ${ICONS[running]}/}"
+session_name=$(grep "session_name" "${ROOT}/${filename}.yaml" | awk -F": " '{print $2}')
+
+# actions for sessions
+ACTIONS=("${ICONS[edit]}")
+
+# if tmux is running and the session is not in sessions_running, add 'load-detach'
+if [[ -n "${TMUX:-}" && " ${sessions_running[*]} " != *" $session_name "* ]]; then
+    ACTIONS+=("${ICONS["load-switch"]}")
+    ACTIONS+=("${ICONS["load-detach"]}")
+fi
+
+# add opt if session is already loaded
+if tmux has-session -t "$session_name" 2>/dev/null && [[ -z "${TMUX:-}" ]]; then
+    ACTIONS+=("${ICONS[attach]}")
+elif [[ -n "${TMUX:-}" ]] && tmux has-session -t "$session_name" 2>/dev/null; then
+    ACTIONS+=("${ICONS[switch]}")
+elif [[ -z "${TMUX:-}" ]]; then
+    ACTIONS+=("${ICONS["load-attach"]}")
+    ACTIONS+=("${ICONS["load-detach"]}")
+fi
+
+action=$(printf "%s\n" "${ACTIONS[@]}" | fzf "${FZFARGS[@]}" --prompt="${ICONS[prompt]} ${session_name}> ")
+[[ -z "$action" ]] && exit 1
+action=$(echo "$action" | cut -d' ' -f2)
+
+case "$action" in
+edit) nvim "${ROOT}/${filename}.yaml" ;;
+attach) tmux attach-session -t "$session_name" ;;
+load-attach) tmuxp load "$filename" ;;
+load-detach) tmuxp load -d "$filename" ;;
+load-switch) tmuxp load -d "$filename" && tmux switch-client -t "$session_name" ;;
+switch) tmux switch-client -t "$session_name" ;;
+*)
+    printf "%s: %s\n" "$PROG" "Unknown action: $action" >&2
+    exit 1
+    ;;
+esac
