@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# ┏┳┓╻┏ ┏━┓┏━╸┏━┓╻┏━┓╺┳╸
+# ┃┃┃┣┻┓┗━┓┃  ┣┳┛┃┣━┛ ┃
+# ╹ ╹╹ ╹┗━┛┗━╸╹┗╸╹╹   ╹
+# simple scripts maker
+
+[[ -z "$1" ]] && {
+    cat <<-_EOF
+usage: ${0##*/} [OPTIONS]
+
+Options:
+    --posix         POSIX-compliant
+    -h, --help      Show this help
+_EOF
+    exit 1
+}
+
+SHEBANG="#!/usr/bin/env bash"
+declare -a OPTS=("set -o errexit" "set -o nounset")
+
+if [[ "$1" == "--posix" ]]; then
+    shift
+    SHEBANG="#!/bin/sh"
+else
+    OPTS+=("set -o pipefail")
+fi
+
+cat <<EOF >"$1"
+$SHEBANG
+
+$(echo "$1" | toilet -f future | sed 's/^/# /')
+
+$(printf "%s\n" "${OPTS[@]}")
+
+EOF
+
+# shellcheck disable=SC2016
+echo -E 'PROG="${0##*/}"' >>"$1"
+chmod +x "$1"
