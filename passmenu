@@ -8,7 +8,7 @@
 
 shopt -s nullglob globstar
 
-set -eou pipefail
+set -ou pipefail
 
 PROG="${0##*/}"
 DEPS=(xdotool pass dmenu)
@@ -67,6 +67,21 @@ EOF
     exit 0
 }
 
+function _notifyme {
+    if ! _has notify-send; then
+        return
+    fi
+
+    export DISPLAY=":0"
+    local mesg="$1"
+    local cmd=notify-send
+    declare -a args=(-i "gtk-dialog-authentication")
+    args+=(-h "string:x-dunst-stack-tag:pass")
+    args+=(-r 888)
+
+    "$cmd" "${args[@]}" "${PROG^^}" "$mesg"
+}
+
 function _logerr {
     local mesg="$*"
     printf "%s: %s\n" "$PROG" "$mesg" >&2
@@ -91,21 +106,6 @@ function _has {
             return 1
         fi
     done
-}
-
-function _notifyme {
-    if ! _has notify-send; then
-        return
-    fi
-    local prog
-    local mesg="$1"
-    local cmd=notify-send
-    declare -a args=(-i "dialog-password-symbolic")
-    args+=(-h "string:x-dunst-stack-tag:pass")
-    args+=(-r 888)
-    prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
-
-    "$cmd" "${args[@]}" "$prog" "$mesg"
 }
 
 function _has_line {
@@ -283,7 +283,7 @@ function _pwd_otp_code {
     # check if otp exists
     local _otp
     _otp="$($PASS otp "$pwd")"
-    retcode=$?
+    local retcode=$?
     if [[ "$retcode" -gt 0 ]]; then
         _logerr "no OTP found for ${pwd}"
     fi
@@ -465,12 +465,12 @@ function main {
     if _in_terminal && _has fzf; then
         MENU=fzf
         MENU_OPTS+=(--tmux "center,50%")
+    elif _has dmenu; then
+        MENU=dmenu
+        MENU_OPTS+=(-l 10)
     elif _has rofi; then
         MENU=rofi
         MENU_OPTS+=(-dmenu)
-        MENU_OPTS+=(-l 10)
-    elif _has dmenu; then
-        MENU=dmenu
         MENU_OPTS+=(-l 10)
     fi
 
