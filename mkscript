@@ -3,7 +3,7 @@
 # ┏┳┓╻┏ ┏━┓┏━╸┏━┓╻┏━┓╺┳╸
 # ┃┃┃┣┻┓┗━┓┃  ┣┳┛┃┣━┛ ┃
 # ╹ ╹╹ ╹┗━┛┗━╸╹┗╸╹╹   ╹
-# simple scripts maker
+# simple scripts template
 
 [[ -z "$1" ]] && {
     cat <<-_EOF
@@ -29,12 +29,9 @@ fi
 cat <<EOF >"$1"
 $SHEBANG
 
-$(echo "$1" | toilet -f future | sed 's/^/# /')
-
 $(printf "%s\n" "${OPTS[@]}")
 
 EOF
 
 # shellcheck disable=SC2016
 echo -E 'PROG="${0##*/}"' >>"$1"
-chmod +x "$1"
