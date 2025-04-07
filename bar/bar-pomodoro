@@ -12,4 +12,13 @@ if ! command -v "$CMD" >/dev/null; then
     exit 1
 fi
 
-$CMD status
+status=$($CMD status)
+[[ -z "$status" ]] && exit
+
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    ICON=""
+else
+    ICON=""
+fi
+
+echo "$ICON $($CMD status)"

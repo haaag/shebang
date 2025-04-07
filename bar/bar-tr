@@ -7,25 +7,54 @@
 
 set -o pipefail
 
-monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
-if [[ "$monitors" -eq 1 ]]; then
+# monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+# if [[ "$monitors" -eq 1 ]]; then
+#     exit
+# fi
+
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    icon_stopped=""
+    icon_seed=""
+    icon_done=""
+    icon_idle=""
+    icon_upload=""
+    icon_download=""
+else
+    icon_stopped=""
+    icon_seed="󰹣"
+    icon_done=""
+    icon_idle=""
+    icon_upload="󰬭"
+    icon_download="󰬧"
+fi
+
+case $BLOCK_BUTTON in
+1) setsid -f "$TERMINAL" -e tm ;;
+2) td-toggle ;;
+3) notify-send "${icon_seed} Torrent module" "\- Left click to open tremc.
+- Middle click to toggle transmission.
+- Shift click to edit script.
+Module shows number of torrents:
+${icon_stopped}: paused
+${icon_idle}: idle (seeds needed)
+${icon_upload}: uploading (unfinished)
+${icon_download}: downloading
+${icon_done}: done
+${icon_seed}: done and seeding" ;;
+6) setsid -f "$TERMINAL" -e "$EDITOR" "$0" ;;
+*) ;;
+esac
+
+if ! pgrep -f "transmission-daemon" >/dev/null; then
     exit
 fi
 
-function main {
-    if ! pgrep -f "transmission-daemon" >/dev/null; then
-        return
-    fi
-
-    transmission-remote -l | grep % |
-        sed " # The letters are for sorting and will not appear.
-    s/.*Stopped.*/A  /;
-    s/.*Seeding.*/Z  /;
-    s/.*100%.*/N  /;
-    s/.*Idle.*/B  /;
-    s/.*Uploading.*/L  /;
-    s/.*%.*/M  /" |
-        sort -h | uniq -c | awk '{print $3, $1}' | paste -sd '  ' -
-}
-
-main
+transmission-remote -l | grep % |
+    sed " # The letters are for sorting and will not appear.
+    s/.*Stopped.*/A $icon_stopped /;
+    s/.*Seeding.*/Z $icon_seed /;
+    s/.*100%.*/N $icon_done /;
+    s/.*Idle.*/B $icon_idle /;
+    s/.*Uploading.*/L $icon_upload /;
+    s/.*%.*/M $icon_download /" |
+    sort -h | uniq -c | awk '{print $3, $1}' | paste -sd '  ' -

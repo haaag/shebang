@@ -3,8 +3,21 @@
 # Script for displaying CPU usage
 #
 # Output: [ICON 10%]
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    ICON="" # "" "" ""
+else
+    ICON="" # "" "" ""
+fi
 
-ICON="" # 
+case "${BLOCK_BUTTON:-}" in
+1) notify-send "🖥 CPU hogs" "$(ps axch -o cmd,%cpu | awk '{cmd[$1]+=$2} END {for (i in cmd) print i, cmd[i]}' | sort -nrk2 | head)\\n(100% per core)" ;;
+2) setsid -f "${TERMINAL:-st}" -e htop ;;
+3) notify-send "🖥 CPU module " "\- Shows CPU temperature.
+- Click to show intensive processes.
+- Middle click to open htop." ;;
+6) setsid -f "$TERMINAL" -e "${EDITOR:-nvim}" "$0" ;;
+*) ;;
+esac
 
 function dwm_cpu_old {
     cpu=$(top -bn1 | grep Cpu | awk '{print $2}')

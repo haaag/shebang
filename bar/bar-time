@@ -4,5 +4,9 @@
 #
 # Output: [ICON 16:12]
 
-icon=""
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    icon=""
+else
+    icon=" "
+fi
 printf "%s%s %s%s\n" "${SEP1:-}" "$icon" "$(date "+%H:%M")" "${SEP2:-}"

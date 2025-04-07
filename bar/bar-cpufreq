@@ -4,7 +4,11 @@
 #
 # Output: [ICON governor]
 
-icon=""
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    icon=""
+else
+    icon=""
+fi
 governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 
 printf "%s%b %s%s\n" "${SEP1:-}" "$icon" "$governor" "${SEP2:-}"

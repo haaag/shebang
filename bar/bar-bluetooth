@@ -8,7 +8,7 @@ PROG=$(basename "$0")
 LOGGER="${LOGS_PATH:-$HOME/dcs/log}/${PROG}.log"
 
 # devices icon
-ICON_HEADPHONES="" #  
+ICON_HEADPHONES="" #   󰋋 
 ICON_DEV_DEFAULT=""
 
 # battery icons
@@ -19,6 +19,18 @@ icon_low=""
 icon_mid=""
 icon_full=""
 icon_unknow=""
+
+function is_power_on {
+    if bluetoothctl show | grep -q "Powered: yes"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+if ! is_power_on; then
+    exit
+fi
 
 function notify {
     local msg="$1"
@@ -40,14 +52,6 @@ function check_battery {
         msg="$device_alias battery is low ${warn} ${icon_critical}${battery}%"
         echo "$msg" | tee -a "$LOGGER"
         notify "$msg" "critical"
-    fi
-}
-
-function is_power_on {
-    if bluetoothctl show | grep -q "Powered: yes"; then
-        return 0
-    else
-        return 1
     fi
 }
 

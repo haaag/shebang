@@ -12,6 +12,20 @@ MAX_TEMP=95
 NOTIFYID=888
 WARN_NOTIFIED="/tmp/${PROG}-high"
 
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    icon_cold=""
+    icon_low=""
+    icon_mid=""
+    icon_high=""
+    icon_extreme=""
+else
+    icon_cold=""
+    icon_low=""
+    icon_mid=""
+    icon_high=""
+    icon_extreme=""
+fi
+
 function _notify {
     local msg="$1"
     export DISPLAY=":0"
@@ -25,15 +39,15 @@ function _get_icon {
     local temp="$1"
     local icon
     if [[ "${temp}" -ge 20 && "${temp}" -le 40 ]]; then
-        icon=""
+        icon="$icon_cold"
     elif [[ "${temp}" -ge 41 && "${temp}" -le 50 ]]; then
-        icon=""
+        icon="$icon_low"
     elif [[ "${temp}" -ge 51 && "${temp}" -le 60 ]]; then
-        icon=""
+        icon="$icon_mid"
     elif [[ "${temp}" -ge 61 && "${temp}" -le 70 ]]; then
-        icon=""
+        icon="$icon_high"
     elif [[ "${temp}" -ge 71 && "${temp}" -le 79 ]]; then
-        icon=""
+        icon="$icon_extreme"
     else
         icon="${WARN_ICON}"
     fi

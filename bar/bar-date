@@ -6,9 +6,14 @@
 # formatted date.
 #
 # output: "[ICON Fri, DD MMM]"
-#      
+#        󰭦 󰭨 
 
-ICON=" "
+
+if [ "${DWM_BAR_FILLED:-1}" -eq 0 ]; then
+    ICON=" "
+else
+    ICON=" "
+fi
 monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
 if [ "$monitors" -eq 1 ]; then
     d=$(date "+%d %b")

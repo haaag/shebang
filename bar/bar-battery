@@ -10,12 +10,35 @@ CRITICAL=10
 
 # notification icons
 warn="🔴"
-icon_critical=""
-icon_empty=""
-icon_low=""
-icon_mid=""
-icon_full=""
-icon_char=""
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    icon_critical=" "
+    icon_empty=" "
+    icon_low=" "
+    icon_mid=" "
+    icon_full=" "
+    icon_char=""
+else
+    icon_critical="󰂎"
+    icon_empty="󰁺"
+    icon_low="󰁼"
+    icon_mid="󰁿"
+    icon_full="󰁹"
+    icon_char=""
+fi
+
+case "${BLOCK_BUTTON:-}" in
+3) notify-send "🔋 Battery module" "🔋: discharging
+🛑: not charging
+♻: stagnant charge
+🔌: charging
+${icon_char}: charged
+❗: battery very low!
+- Scroll to change adjust xbacklight." ;;
+4) xbacklight -inc 10 ;;
+5) xbacklight -dec 10 ;;
+6) setsid -f "$TERMINAL" -e "$EDITOR" "$0" ;;
+*) ;;
+esac
 
 function _notifyme {
     local args
@@ -111,7 +134,7 @@ function _display_charging_bar {
 }
 
 function _display_icon {
-    printf "%b %s%%" "$(_get_icon)" " $BAT_CHARGE"
+    printf "%b%s%%" "$(_get_icon)" " $BAT_CHARGE"
 }
 
 function _render_unicodes {

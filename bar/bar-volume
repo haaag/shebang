@@ -8,11 +8,27 @@ PROG=$(basename "$0")
 ICON_BAR=""
 ICON_NOTIFY=""
 
+case "${BLOCK_BUTTON:-}" in
+1) setsid --fork pavucontrol ;;
+2) notify-send "TWO" "...." ;;
+4) wpctl set-volume 3%+ ;;
+5) wpctl set-volume 3%- ;;
+6) terminal -e "${EDITOR:-nvim}" "$0" ;;
+*) ;;
+esac
+
 # bar icons
-low_icon=""
-mid_icon=""
-high_icon=""
-muted_icon=""
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    low_icon=""
+    mid_icon=""
+    high_icon=""
+    muted_icon=""
+else
+    low_icon=""
+    mid_icon=""
+    high_icon=""
+    muted_icon=""
+fi
 
 # notification icons
 noti_low_icon="audio-volume-low-symbolic"

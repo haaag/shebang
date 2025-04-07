@@ -11,8 +11,14 @@ if [[ "$monitors" -eq 1 ]]; then
     exit
 fi
 
-PLAYING=""
-# PLAYING=""
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    PLAYING=""
+    # PLAYING=" "
+    # PLAYING=""
+else
+    PLAYING=""
+    # PLAYING=""
+fi
 
 function _logerr {
     printf "%s: %s\n" "${0##*/}" "$*" >&2
@@ -30,7 +36,7 @@ function _is_running {
 }
 
 function _mpd_status {
-    local status artist track pos dur
+    local status artist track
     status=$(mpc status | sed -n 2p | awk '{print $1;}')
     if [[ "$status" = "[paused]" ]]; then
         return
@@ -40,10 +46,12 @@ function _mpd_status {
 
     artist=$(mpc current -f %artist%)
     track=$(mpc current -f %title%)
-    pos=$(mpc status | grep "%)" | awk '{ print $3 }' | awk -F/ '{ print $1 }')
-    dur=$(mpc current -f %time%)
 
-    printf "%s %s - %s %s/%s\n" "$status" "$artist" "$track" "$pos" "$dur"
+    # pos=$(mpc status | grep "%)" | awk '{ print $3 }' | awk -F/ '{ print $1 }')
+    # dur=$(mpc current -f %time%)
+    # printf "%s %s - %s %s/%s\n" "$status" "$artist" "$track" "$pos" "$dur"
+    #
+    printf "%s %s - %s\n" "$status" "$artist" "$track"
 }
 
 function _tidal_status {
@@ -51,7 +59,7 @@ function _tidal_status {
         _logerr "jq not found"
     fi
 
-    local json track artist status pos dur
+    local json track artist status
     local host="http://localhost:47836"
     json=$(curl -s "$host/current")
     [[ -z "$json" ]] && _logerr "err fetching tidal-hifi status"
@@ -65,10 +73,12 @@ function _tidal_status {
 
     track=$(echo "$json" | jq -r '.title')
     artist=$(echo "$json" | jq -r '.artist')
-    pos=$(echo "$json" | jq -r '.current')
-    dur=$(echo "$json" | jq -r '.duration')
 
-    printf "%s %s - %s %s/%s\n" "$status" "$artist" "$track" "$pos" "$dur"
+    # pos=$(echo "$json" | jq -r '.current')
+    # dur=$(echo "$json" | jq -r '.duration')
+    # printf "%s %s - %s %s/%s\n" "$status" "$artist" "$track" "$pos" "$dur"
+
+    printf "%s %s - %s\n" "$status" "$artist" "$track"
 }
 
 function main {

@@ -26,8 +26,8 @@ function get_interface {
     local wlan="wlp2s0"
 
     declare -A interfaces
-    interfaces["$ether"]="" # "" # ""
-    interfaces["$wlan"]="" # ""  #"" # ""
+    interfaces["$ether"]="󰈀" # "󰡁" "" ""
+    interfaces["$wlan"]="" #""  # "" ""  #"" # ""
 
     local exclude="loopback"
     status=$(nmcli device status | grep "$ether\|$wlan")
@@ -46,13 +46,13 @@ function get_interface {
 function get_icons {
     declare -a icons=()
     icons+=(                 )
-    icons+=(                )
-    icons+=(          )
+    icons+=(                 )
+    icons+=( 󰈀           )
     icons+=(            )
     icons+=(                   )
     icons+=(               )
-    icons+=(             )
-    icons+=(                )
+    icons+=(            )
+    icons+=(                 )
     icons+=(         )
     icons+=(               )
 }
@@ -153,33 +153,62 @@ function is_running {
     local cmd="$1"
     local enable="$2"
     local disable="$3"
+    declare -a args
 
-    if ! pgrep -f "$cmd" >/dev/null; then
+    if [[ ${#cmd} -gt 15 ]]; then
+        args=("-f" "$cmd")
+    else
+        args=("-x" "$cmd")
+    fi
+
+    if ! pgrep "${args[@]}" >/dev/null; then
         printf "%s" "$disable"
     else
         printf "%s" "$enable"
     fi
 }
 
+function is_running_new {
+    local cmd="$1"
+    local enable="$2"
+    local disable="$3"
+
+    # Usar pgrep -f y luego filtrar solo el PID del proceso principal
+    pid=$(pgrep -f -o "$cmd")
+
+    if [[ -z "$pid" ]]; then
+        printf "%s" "$disable"
+    else
+        # Si el PID es válido, verificamos que no sea un subproceso
+        # Puedes ajustar esta parte para que valid más específicamente según lo que necesitas
+        if ps -p "$pid" -o comm= | grep -E "^$cmd" >/dev/null; then
+            printf "%s" "$enable"
+        else
+            printf "%s" "$disable"
+        fi
+    fi
+}
+
 function main {
     declare -A programs
     programs["transmission-daemon"]=""
-    programs["alarm"]=""
-    programs["ollama"]="" # "" ""
+    programs["timer"]=""
+    programs["ollama"]=""
     programs["bitwarden"]=""
-    programs["jellyfin"]=""
+    programs["jellyfin"]="󰿎"
     programs["galculator"]=""
-    programs["newsboat"]=""       # "" # "" ""
+    programs["newsboat"]=""       # "󰎕" "" # "" "" "󱀄"
     programs["mpv"]=""            #  # 
     programs["signal-desktop"]="" # ""
     programs["dragon"]=""
-    programs["telegram"]="" # ""
+    programs["telegram"]=""
     programs["share-files"]=""
+    programs["tor"]=""
+    # programs["goairdrop"]=""
     # programs["obs"]=""
     # programs["tidal-hifi"]=""
     # programs["ytlocal"]=""
     # programs["xbps-install"]=""
-    # programs["nvim"]=""
 
     mapfile -t icons < <(get_interface)
     icons+=("$(is_microphone_on)")
@@ -193,7 +222,8 @@ function main {
 
     # maybe implement option to display fallback icon if proc not running
     icons+=("$(is_running "xautolock" "" "")")
-    icons+=("$(is_running "ytlocal" "" "")")
+    icons+=("$(is_running "pytlocal" "" "")")
+    icons+=("$(is_running "goairdrop" "" "")")
 
     icons+=("$(is_notifications_on)")
     icons+=("$(is_redshift_enable)")
