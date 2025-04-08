@@ -65,10 +65,10 @@ function load_icons {
     elif [[ "$VOL" -gt 0 && "$VOL" -le 15 ]]; then
         ICON_BAR="$low_icon"
         ICON_NOTIFY="$noti_low_icon"
-    elif [[ "$VOL" -gt 16 && "$VOL" -le 65 ]]; then
+    elif [[ "$VOL" -gt 15 && "$VOL" -le 65 ]]; then
         ICON_BAR="$mid_icon"
         ICON_NOTIFY="$noti_med_icon"
-    elif [[ "$VOL" -gt 66 && "$VOL" -le 100 ]]; then
+    elif [[ "$VOL" -gt 65 && "$VOL" -le 100 ]]; then
         ICON_BAR="$high_icon"
         ICON_NOTIFY="$noti_high_icon"
     else

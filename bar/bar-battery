@@ -6,7 +6,12 @@
 # Output: [UNICODE 98% status]
 
 BAT_CHARGE=$(cat /sys/class/power_supply/BAT0/capacity)
+BAT_STATUS=$(cat /sys/class/power_supply/BAT0/status)
 CRITICAL=10
+
+if [[ "$BAT_STATUS" == "Full" ]]; then
+    exit 0
+fi
 
 # notification icons
 warn="🔴"
@@ -26,20 +31,6 @@ else
     icon_char=""
 fi
 
-case "${BLOCK_BUTTON:-}" in
-3) notify-send "🔋 Battery module" "🔋: discharging
-🛑: not charging
-♻: stagnant charge
-🔌: charging
-${icon_char}: charged
-❗: battery very low!
-- Scroll to change adjust xbacklight." ;;
-4) xbacklight -inc 10 ;;
-5) xbacklight -dec 10 ;;
-6) setsid -f "$TERMINAL" -e "$EDITOR" "$0" ;;
-*) ;;
-esac
-
 function _notifyme {
     local args
     local cmd=notify-send
@@ -51,14 +42,8 @@ function _notifyme {
     "$cmd" "${args[@]}"
 }
 
-function _bat_statues {
-    local current
-    current=$(cat /sys/class/power_supply/BAT0/status)
-    echo "$current"
-}
-
 function _is_charching {
-    if [[ $(_bat_statues) != "Charging" ]]; then
+    if [[ "$BAT_STATUS" != "Charging" ]]; then
         return 1
     fi
     return 0

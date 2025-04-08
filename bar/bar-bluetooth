@@ -8,17 +8,22 @@ PROG=$(basename "$0")
 LOGGER="${LOGS_PATH:-$HOME/dcs/log}/${PROG}.log"
 
 # devices icon
-ICON_HEADPHONES="" #   󰋋 
-ICON_DEV_DEFAULT=""
+if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
+    ICON_HEADPHONES=""  #   󰋋 
+    ICON_DEV_DEFAULT="󰎇" # ""
+else
+    ICON_HEADPHONES="" #   󰋋 
+    ICON_DEV_DEFAULT=""
+fi
 
 # battery icons
 warn="🔴"
-icon_critical=""
-icon_empty=""
-icon_low=""
-icon_mid=""
-icon_full=""
-icon_unknow=""
+icon_critical="󰤿 "
+icon_empty="󰤿 "
+icon_low="󰥀 "
+icon_mid="󰥂 "
+icon_full="󰥈 "
+icon_unknow="󰥇 "
 
 function is_power_on {
     if bluetoothctl show | grep -q "Powered: yes"; then

@@ -27,7 +27,7 @@ function get_interface {
 
     declare -A interfaces
     interfaces["$ether"]="󰈀" # "󰡁" "" ""
-    interfaces["$wlan"]="" #""  # "" ""  #"" # ""
+    interfaces["$wlan"]="󰖩"  # ""  "" "" "" ""
 
     local exclude="loopback"
     status=$(nmcli device status | grep "$ether\|$wlan")

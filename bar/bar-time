@@ -5,7 +5,7 @@
 # Output: [ICON 16:12]
 
 if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
-    icon=""
+    icon=" "
 else
     icon=" "
 fi
