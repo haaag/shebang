@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+
+# ┏━╸╻ ╻┏━┓┏━╸╻  ┏━╸┏━┓┏━┓┏━╸
+# ┃╺┓┣━┫┣┳┛┣╸ ┃  ┣╸ ┣━┫┗━┓┣╸
+# ┗━┛╹ ╹╹┗╸┗━╸┗━╸┗━╸╹ ╹┗━┛┗━╸
+# checks github repo version release
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+PROG="${0##*/}"
+DEPS=(curl jq)
+
+REPO_OWNER=
+REPO_NAME=
+REPO_URL=
+REPO_CACHE_FILE=
+REPO_LATEST_VER=
+REPO_TAG_VERSION=".tag_name"
+
+function _usage {
+    cat <<-EOF
+Usage: $PROG [OPTIONS]
+
+Checks github release by repo owner and name
+
+Options:
+    -o  Repositoy owner
+    -n  Repository name
+    -h  Print help
+EOF
+}
+
+function _logerr {
+    printf "%s: %s\n" "${PROG:-err}" "$*" >&2
+    exit 1
+}
+
+function _has {
+    local c
+    local verbose=false
+    if [[ $1 == '-v' ]]; then
+        verbose=true
+        shift
+    fi
+    for c in "$@"; do
+        c="${c%% *}"
+        if ! command -v "$c" &>/dev/null; then
+            [[ "$verbose" == true ]] && _logerr "$c dependency not found"
+            return 1
+        fi
+    done
+}
+
+function _repo_url {
+    [[ -z "$REPO_OWNER" ]] && _logerr "repo owner can not be empty"
+    [[ -z "$REPO_NAME" ]] && _logerr "repo name can not be empty"
+    echo "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
+}
+
+function _fetch_git_data {
+    [[ -z "$REPO_CACHE_FILE" ]] && _logerr "cache file can not be empty"
+    [[ -z "$REPO_URL" ]] && _logerr "repo url can not be empty"
+    curl -s "$REPO_URL" -o "$REPO_CACHE_FILE"
+}
+
+function _fetch_latest_version {
+    _fetch_git_data
+    jq -r "$REPO_TAG_VERSION" "$REPO_CACHE_FILE"
+}
+
+function main {
+    if [[ "$#" -eq 0 ]]; then
+        _usage
+        exit 1
+    fi
+
+    _has -v "${DEPS[@]}"
+    while getopts 'o:n:h' flag; do
+        case "${flag}" in
+        o) REPO_OWNER="${OPTARG}" ;;
+        n) REPO_NAME="${OPTARG}" ;;
+        h) _usage && exit 0 ;;
+        *) _usage && exit 1 ;;
+        esac
+    done
+
+    REPO_URL=$(_repo_url)
+    REPO_CACHE_FILE="/tmp/${REPO_NAME}.json"
+    REPO_LATEST_VER=$(_fetch_latest_version)
+
+    if [[ "$REPO_LATEST_VER" == "null" ]]; then
+        _logerr "no release found"
+    fi
+
+    echo "$REPO_LATEST_VER"
+}
+
+main "$@"

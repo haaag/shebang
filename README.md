@@ -3,6 +3,10 @@
 [![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](#)
 [![Bash](https://img.shields.io/badge/Bash-4EAA25?logo=gnubash&logoColor=fff)](#)
 
+> [!TIP]
+> 🆕 New:
+> [`ghrelease`](https://github.com/haaag/shebang/blob/main/ghrelease) - checks github repo version release
+
 - [`brightness`](https://github.com/haaag/shebang/blob/main/brightness) - managing brightness
 - [`burniso`](https://github.com/haaag/shebang/blob/main/burniso) - burning `iso` images to USB devices using `dd`
 - [`mkscript`](https://github.com/haaag/shebang/blob/main/mkscript) - simple `scripts` template
