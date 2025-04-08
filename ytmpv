@@ -21,6 +21,9 @@ PROMPT="  ${PROG}>"
 DBNAME="ytmpv.db"
 DBPATH="${LOGS_PATH:-$HOME}/$DBNAME"
 
+DEF_TITLE="err: no video title found"
+DEF_CHANNEL="err: no video channel found"
+
 function _logerr {
     printf "%s: %s\n" "$PROG" "$*" >&2
     exit 1
@@ -80,6 +83,10 @@ function _logger {
     [[ -z "$title" ]] && _notifyerr "no TITLE found"
     [[ -z "$url" ]] && _notifyerr "no URL found"
 
+    if [[ "$channel" == "$DEF_CHANNEL" && "$title" == "$DEF_TITLE" ]]; then
+        return
+    fi
+
     sqlite3 "$DBPATH" <<EOF
 INSERT OR IGNORE INTO youtube (channel, title, url, date) VALUES ('$channel', '$title', '$url', datetime('now'));
 EOF
@@ -116,7 +123,7 @@ function _extract_title {
     [[ -z "$html" ]] && _notifyerr "no HTML content found"
 
     title=$(echo "$html_content" | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
-    [[ -z "$title" ]] && title="err: no video title found"
+    [[ -z "$title" ]] && title=$DEF_TITLE
 
     echo "$title"
 }
@@ -126,8 +133,7 @@ function _extract_channel {
     [[ -z "$html" ]] && _notifyerr "no HTML content found"
 
     channel_name=$(echo "$html" | perl -l -0777 -ne 'print $1 if /<link itemprop="name" content="(.*?)"/')
-    # channel_name=$(curl -sL "$url" | perl -l -0777 -ne 'print $1 if /"ownerChannelName":"(.*?)"/si')
-    [[ -z "$channel_name" ]] && channel_name="err: failed to extract channel name."
+    [[ -z "$channel_name" ]] && channel_name=$DEF_CHANNEL
 
     echo "$channel_name"
 }
