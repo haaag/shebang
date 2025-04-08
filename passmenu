@@ -24,7 +24,7 @@ FAVORITES=${PASSWORD_STORE_DIR:-~/.local/share/pass}/favorites
 
 # menu
 declare -A ICONS
-ICONS["prompt"]=""
+ICONS["prompt"]=""
 ICONS["add"]=""
 ICONS["copy"]=""
 ICONS["edit"]=""
@@ -38,7 +38,7 @@ ICONS["remove"]=""
 ICONS["list"]=""
 
 MENU=
-PROMPT="${ICONS[prompt]} PassMenu> "
+PROMPT="${ICONS[prompt]} Pass> "
 declare -a MENU_OPTS=()
 
 # colors

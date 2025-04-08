@@ -11,6 +11,7 @@ PROG="${0##*/}"
 DURATION="${1:-}"
 TIMER_NAME="${2:-}"
 ICON=""
+ICON=""
 DEPS=(notify-send dmenu mpv)
 
 # files
@@ -64,7 +65,7 @@ function _checkdeps {
 }
 
 function pre_exit {
-    local files=("$TIMEFILE" "$PIDFILE" "$MPVPID")
+    local files=("$TIMEFILE" "$PIDFILE")
     for f in "${files[@]}"; do
         [[ -e "$f" ]] && rm -f "$f"
     done
@@ -116,10 +117,12 @@ function _interpret_time {
 function _cancel_timer {
     if [[ -e "$MPVPID" ]]; then
         kill -9 "$(cat "$MPVPID")" &>/dev/null
+        rm "$MPVPID"
     fi
 
     if [[ ! -e "$PIDFILE" ]]; then
-        _logerr "no timer found"
+        _logme "no timer found"
+        return
     fi
 
     _logme "timer '$TIMER_NAME' cancelled"
@@ -162,7 +165,7 @@ function _show_status {
     local time_diff_hours time_diff_minutes time_diff_seconds
 
     if [[ ! -f "$TIMEFILE" ]]; then
-        return
+        return 1
     fi
 
     current=$(date +%s)
@@ -170,7 +173,7 @@ function _show_status {
     time_diff=$((time - current))
 
     if [[ "$time_diff" -lt 0 ]]; then
-        return
+        return 1
     fi
 
     time_diff=${time_diff#-}
@@ -189,12 +192,12 @@ function _show_status {
         result="${time_diff}s"
     fi
 
-    echo "$ICON $result"
+    echo "$result"
 }
 
 function _sound_the_alarm {
     _notifyme "timer <b>'$TIMER_NAME'</b> is up!!!"
-    mpv "$SOUND" --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
+    mpv "$SOUND" --mute=no --loop-file=10 --no-resume-playback >/dev/null 2>&1 &
     mpv_pid=$!
     echo "$mpv_pid" >"$MPVPID"
 }

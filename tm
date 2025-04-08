@@ -106,8 +106,8 @@ function main {
     local magnet="${2:-$subcommand}"
 
     case "$subcommand" in
-    -s | start) _start && _logme "$CMD started" ;;
-    -k | kill) _stop && _logme "$CMD stopped" ;;
+    -s | start) _start && echo "$PROG: $CMD started" ;;
+    -k | kill) _stop && echo "$PROG: stopped" ;;
     -a | add) _add_torrent "$magnet" ;;
     -r | restart) _stop && _start && _notify "$CMD restarted" ;;
     -h | help) shift && _usage ;;

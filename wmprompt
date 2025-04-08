@@ -4,8 +4,8 @@
 
 PROG=$(basename "$0")
 DEPS=(dmenu dwm slock)
-OPTS=(" lock" "⏾ suspend" " hibernate" " logout")
-OPTS+=(" reboot" " poweroff" " restartwm" " displayoff")
+OPTS=(" lock" " suspend" "󰋊 hibernate" "󰍃 logout")
+OPTS+=(" reboot" " poweroff" "󱄌 restartwm" " displayoff")
 XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-dwm}
 
 function _logerr {
@@ -45,7 +45,7 @@ function main {
         ;;
     *logout)
         _logme "logging out"
-        pkill -x Xorg
+        pkill -15 Xorg
         ;;
     *restartwm)
         _logme "restarting dwm"

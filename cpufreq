@@ -41,6 +41,9 @@ function _logerr {
 function _logme {
     local msg="$1"
     local color="${2:-$BLUE}"
+    if [[ -n "${NO_COLOR:-}" ]]; then
+        return
+    fi
     printf "%s: %b%s%b\n" "$PROG" "$color" "$msg" "$RESET"
 }
 
@@ -75,8 +78,7 @@ function _help_modes {
 }
 
 function _notifyme {
-    if [[ -z "$DISPLAY" ]]; then
-        _logme "no display found"
+    if [[ -z "${DISPLAY:-}" || -n ${NO_COLOR:-} ]]; then
         return
     fi
 
