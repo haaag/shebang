@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# ╺┳╸┏━┓┏━╸┏┓╻╺┳┓
+#  ┃ ┗━┓┣╸ ┃┗┫ ┃┃
+#  ╹ ┗━┛┗━╸╹ ╹╺┻┛
+# send a command to execute in all sessions and all windows|panes
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+PROG="${0##*/}"
+
+[[ -z "${1:-}" ]] && {
+    cat <<-_EOF
+usage: $PROG [COMMAND]
+    send a command to execute in all sessions and all windows|panes
+_EOF
+    exit 1
+}
+
+tmux list-sessions -F '#{session_name}' | while read -r session; do
+    [[ "$session" == "ollama" ]] && continue
+
+    tmux list-windows -t "$session" -F '#{window_index}' | while read -r window; do
+        tmux list-panes -t "${session}:${window}" -F '#{session_name}:#{window_index}.#{pane_index} #{pane_current_command}' |
+            while read -r pane cmd; do
+                case "$cmd" in
+                bash | zsh)
+                    tmux send-keys -t "$pane" "$1" C-m
+                    ;;
+                *)
+                    echo "Skipping $pane (running $cmd)"
+                    ;;
+                esac
+            done
+    done
+done
