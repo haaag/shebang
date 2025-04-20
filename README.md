@@ -5,6 +5,7 @@
 
 > [!NOTE]
 > 🆕 [`ghrelease`](https://github.com/haaag/shebang/blob/main/ghrelease) - checks github repo version release
+> 🆕 [`tsend`](https://github.com/haaag/shebang/blob/main/tsend) - send a command to execute in all sessions and all windows|panes
 
 - [`brightness`](https://github.com/haaag/shebang/blob/main/brightness) - managing brightness
 - [`burniso`](https://github.com/haaag/shebang/blob/main/burniso) - burning `iso` images to USB devices using `dd`

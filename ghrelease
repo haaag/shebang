@@ -4,6 +4,13 @@
 # ┃╺┓┣━┫┣┳┛┣╸ ┃  ┣╸ ┣━┫┗━┓┣╸
 # ┗━┛╹ ╹╹┗╸┗━╸┗━╸┗━╸╹ ╹┗━┛┗━╸
 # checks github repo version release
+#
+# usage:
+#   ghrelease -o ollama -n ollama
+#
+# output:
+#   v0.6.5
+
 
 set -o errexit
 set -o nounset
