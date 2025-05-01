@@ -3,13 +3,18 @@
 # ┏━╸╻╻  ┏━╸┏━┓
 # ┣╸ ┃┃  ┣╸ ┗━┓
 # ╹  ╹┗━╸┗━╸┗━┛
-# simple file-selector and share with <dragon-drop> | <localsend>
-# deps: <nnn> <dragon-drop> <localsend>
+# simple file-selector and share with <nnn> [<dragon-drop> | <localsend>]
+# deps: <nnn> <dragon-drop> <localsend> <exiftool> <openssl>
+# when selecting images, <exiftool> is used to clean EXIF.
 
 set -euo pipefail
 
+# TODO: functions `dragon-drop` and `localsend` should be split, they are
+# almost the same.
+
 PROG="${0##*/}"
-TMPFILE="$(mktemp -t "$PROG.XXXXXX")"
+TMPDIRECTORY="$(mktemp -t -d "$PROG.XXXXXX")"
+TMPFILE="${TMPDIRECTORY}/${PROG}.file"
 
 # shellcheck source=/dev/null
 [[ -f "$HOME/.config/shell/nnn.sh" ]] && . "$HOME/.config/shell/nnn.sh"
@@ -27,15 +32,15 @@ Commands:
 EOF
 }
 
-function _detach_cmd {
-    nohup "$@" >"/dev/null" 2>&1 &
-}
-
 function _logerr {
     local msg="$1"
     _notifyme "$msg"
     printf "%s: %s\n" "$PROG" "$msg" >&2
     exit 1
+}
+
+function _logme {
+    printf "%s: %s\n" "$PROG" "$1"
 }
 
 function _has {
@@ -63,50 +68,110 @@ function _notifyme {
 }
 
 function _preexit {
+    if [[ -d "$TMPDIRECTORY" ]]; then
+        rm -rf "$TMPDIRECTORY" 2>/dev/null
+    fi
     if [[ -f "$TMPFILE" ]]; then
         rm "$TMPFILE" 2>/dev/null
     fi
 }
 
-function _select_file {
+function _select_files {
     _has -v nnn
     nnn -p "$TMPFILE"
 }
 
-function _dragon_drop {
-    _has -v dragon-drop
+function _is_image {
     local file="${1:-}"
+    [[ ! -e "$file" ]] && _logerr "'$file' not found"
+    file --mime-type "$file" | grep -qE 'image/'
+}
 
-    if [[ -f "$file" ]]; then
-        setsid -f dragon-drop -x "$file"
-        exit 0
+function _create_tmpfile {
+    local file="${1:-}"
+    [[ ! -e "$file" ]] && _logerr "'$file' not found"
+    local ext="${file##*.}"
+    local newfile
+    newfile="$(openssl rand -hex 8).${ext}"
+
+    echo "${TMPDIRECTORY}/${newfile}"
+}
+
+function _clean_image_exif {
+    local file="${1:-}"
+    [[ ! -e "$file" ]] && _logerr "'$file' not found"
+    if ! _is_image "$file"; then
+        echo "${file}"
+        return
     fi
 
-    _select_file
+    local newfile
+    newfile=$(_create_tmpfile "${file}")
 
-    if [[ -f "$TMPFILE" ]]; then
-        setsid -f dragon-drop --and-exit --stdin --on-top <"$TMPFILE"
+    cp -v "${file}" "${newfile}" >/dev/null
+    exiftool -all= -overwrite_original "${newfile}" &>/dev/null
+    echo "${newfile}"
+}
+
+function _dragon_drop {
+    _has -v dragon-drop
+
+    local inputs
+    # if caller gave us one existing file, use that…
+    if [[ -n ${1:-} && -f ${1:-} ]]; then
+        inputs=("$1")
+    else
+        # otherwise let user select files
+        _select_files || return
+        [[ ! -s $TMPFILE ]] && return 1
+        mapfile -t inputs <"$TMPFILE"
+    fi
+
+    # process each file: clean EXIF if image, log, collect
+    local out cleaned
+    for f in "${inputs[@]}"; do
+        if _is_image "$f"; then
+            cleaned=$(_clean_image_exif "$f")
+            _logme "[+] cleaning EXIF: $(basename "$f") → $cleaned"
+            out+=("$cleaned")
+        else
+            out+=("$f")
+        fi
+    done
+
+    _notifyme "Sharing ${#out[@]} files with dragon-drop..."
+    if ((${#out[@]} == 1)); then
+        dragon-drop --and-exit "${out[0]}"
+    else
+        dragon-drop --and-exit --stdin --on-top \
+            <<<"$(printf '%s\n' "${out[@]}")"
     fi
 }
 
 function _localsend {
     _has -v localsend
-    local files=("$@")
 
-    if [[ ${#files[@]} -eq 0 ]]; then
-        # select files
-        _select_file
-        while IFS= read -r f; do
-            files+=("$f")
-        done <"$TMPFILE"
+    # collect inputs: arguments or via _select_files
+    local inputs=("$@")
+    if ((${#inputs[@]} == 0)); then
+        _select_files || return
+        mapfile -t inputs <"$TMPFILE"
     fi
 
-    for file in "${files[@]}"; do
-        echo "f::$file"
+    # clean EXIF on images, build cleaned list
+    local out cleaned
+    for f in "${inputs[@]}"; do
+        if _is_image "$f"; then
+            cleaned=$(_clean_image_exif "$f")
+            _logme "[+] cleaning EXIF: $(basename "$f") → $cleaned"
+            out+=("$cleaned")
+        else
+            out+=("$f")
+        fi
     done
 
-    _notifyme "Sending ${#files[@]} files with localsend..."
-    _detach_cmd localsend "${files[@]}"
+    _notifyme "Sending ${#out[@]} files with localsend..."
+    localsend "${out[@]}"
 }
 
 trap _preexit EXIT SIGTERM

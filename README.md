@@ -4,9 +4,11 @@
 [![Bash](https://img.shields.io/badge/Bash-4EAA25?logo=gnubash&logoColor=fff)](#)
 
 > [!NOTE]
-> 🆕 [`ghrelease`](https://github.com/haaag/shebang/blob/main/ghrelease) - checks github repo version release
+> 🆕 [`share-files`](https://github.com/haaag/shebang/blob/main/share-files) - simple file-selector and share with [`nnn`](https://github.com/jarun/nnn) and [`dragon-drop`](https://github.com/mwh/dragon) _(remove EXIF metadata from images)_
 >
-> 🆕 [`tsend`](https://github.com/haaag/shebang/blob/main/tsend) - send a command to execute in all sessions and all windows|panes
+> 🆕 [`tsend`](https://github.com/haaag/shebang/blob/main/tsend) - send a command to execute in all sessions and all <windows|panes> in `tmux`
+>
+> 🆕 [`ghrelease`](https://github.com/haaag/shebang/blob/main/ghrelease) - checks GitHub repo version release
 
 - [`brightness`](https://github.com/haaag/shebang/blob/main/brightness) - managing brightness
 - [`burniso`](https://github.com/haaag/shebang/blob/main/burniso) - burning `iso` images to USB devices using `dd`
@@ -20,7 +22,6 @@
 - [`recipes`](https://github.com/haaag/shebang/blob/main/recipes) - open my recipes in zathura.
 - [`screenshot`](https://github.com/haaag/shebang/blob/main/screenshot) - `pretty` screenshots
 - [`set-mimetypes`](https://github.com/haaag/shebang/blob/main/set-mimetypes) - set apps for `xdg-open`
-- [`share-files`](https://github.com/haaag/shebang/blob/main/share-files) - simple file-selector and share with [`nnn`](https://github.com/jarun/nnn) and [`dragon-drop`](https://github.com/mwh/dragon)
 - [`suspend-hybrid`](https://github.com/haaag/shebang/blob/main/suspend-hybrid) - hibernate/suspend with `zzz/ZZZ` <small>_(dep: [`hibernate-loop`](https://github.com/haaag/shebang/blob/main/hibernate-loop))_</small>
 - [`sxhkd`](https://github.com/haaag/shebang/blob/main/sxhkd-help) - show `sxhkd` keybinds in `dmenu`
 - [`translate`](https://github.com/haaag/shebang/blob/main/translate) - translate `text` using [`trans`](https://github.com/soimort/translate-shell)
