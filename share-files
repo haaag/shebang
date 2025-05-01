@@ -4,7 +4,7 @@
 # ┣╸ ┃┃  ┣╸ ┗━┓
 # ╹  ╹┗━╸┗━╸┗━┛
 # simple file-selector and share with <nnn> [<dragon-drop> | <localsend>]
-# deps: <nnn> <dragon-drop> <localsend> <exiftool> <openssl>
+# deps: <nnn> <dragon-drop> <localsend> <exiftool> <openssl> <setsid>
 # when selecting images, <exiftool> is used to clean EXIF.
 
 set -euo pipefail
@@ -32,13 +32,6 @@ Commands:
 EOF
 }
 
-function _logerr {
-    local msg="$1"
-    _notifyme "$msg"
-    printf "%s: %s\n" "$PROG" "$msg" >&2
-    exit 1
-}
-
 function _logme {
     printf "%s: %s\n" "$PROG" "$1"
 }
@@ -59,21 +52,19 @@ function _has {
     done
 }
 
+function _logerr {
+    local msg="$1"
+    _notifyme "$msg"
+    printf "%s: %s\n" "$PROG" "$msg" >&2
+    exit 1
+}
+
 function _notifyme {
     _has -v notify-send || return
     local prog
     local mesg="<b>$1</b>"
     prog=$(echo "$PROG" | tr '[:lower:]' '[:upper:]')
     notify-send -i "gnome-user-share" "$prog" "$mesg"
-}
-
-function _preexit {
-    if [[ -d "$TMPDIRECTORY" ]]; then
-        rm -rf "$TMPDIRECTORY" 2>/dev/null
-    fi
-    if [[ -f "$TMPFILE" ]]; then
-        rm "$TMPFILE" 2>/dev/null
-    fi
 }
 
 function _select_files {
@@ -88,6 +79,7 @@ function _is_image {
 }
 
 function _create_tmpfile {
+    _has -v openssl
     local file="${1:-}"
     [[ ! -e "$file" ]] && _logerr "'$file' not found"
     local ext="${file##*.}"
@@ -98,6 +90,7 @@ function _create_tmpfile {
 }
 
 function _clean_image_exif {
+    _has -v exiftool
     local file="${1:-}"
     [[ ! -e "$file" ]] && _logerr "'$file' not found"
     if ! _is_image "$file"; then
@@ -114,7 +107,7 @@ function _clean_image_exif {
 }
 
 function _dragon_drop {
-    _has -v dragon-drop
+    _has -v dragon-drop setsid
 
     local inputs
     # if caller gave us one existing file, use that…
@@ -141,15 +134,15 @@ function _dragon_drop {
 
     _notifyme "Sharing ${#out[@]} files with dragon-drop..."
     if ((${#out[@]} == 1)); then
-        dragon-drop --and-exit "${out[0]}"
+        setsid -f dragon-drop --and-exit "${out[0]}"
     else
-        dragon-drop --and-exit --stdin --on-top \
+        setsid -f dragon-drop --and-exit --stdin --on-top \
             <<<"$(printf '%s\n' "${out[@]}")"
     fi
 }
 
 function _localsend {
-    _has -v localsend
+    _has -v localsend setsid
 
     # collect inputs: arguments or via _select_files
     local inputs=("$@")
@@ -171,10 +164,20 @@ function _localsend {
     done
 
     _notifyme "Sending ${#out[@]} files with localsend..."
-    localsend "${out[@]}"
+    setsid -f localsend "${out[@]}"
 }
 
-trap _preexit EXIT SIGTERM
+# function _preexit {
+#     if [[ -d "$TMPDIRECTORY" ]]; then
+#         rm -rf "$TMPDIRECTORY" 2>/dev/null
+#     fi
+#     if [[ -f "$TMPFILE" ]]; then
+#         rm "$TMPFILE" 2>/dev/null
+#     fi
+# }
+#
+
+# trap _preexit EXIT SIGTERM
 
 function main {
     case "${1:-}" in
