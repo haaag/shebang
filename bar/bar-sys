@@ -27,7 +27,7 @@ function get_interface {
 
     declare -A interfaces
     interfaces["$ether"]="󰈀" # "󰡁" "" ""
-    interfaces["$wlan"]="󰖩"  # ""  "" "" "" ""
+    interfaces["$wlan"]=""  # ""  ""  "" "" "" ""
 
     local exclude="loopback"
     status=$(nmcli device status | grep "$ether\|$wlan")
@@ -222,8 +222,10 @@ function main {
 
     # maybe implement option to display fallback icon if proc not running
     icons+=("$(is_running "xautolock" "" "")")
-    icons+=("$(is_running "pytlocal" "" "")")
+    icons+=("$(is_running "pyytx" "" "")")
+    # icons+=("$(is_running "pytlocal" "" "")")
     icons+=("$(is_running "goairdrop" "" "")")
+    icons+=("$(is_running "udiskie" "" "")")
 
     icons+=("$(is_notifications_on)")
     icons+=("$(is_redshift_enable)")

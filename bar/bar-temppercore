@@ -8,6 +8,7 @@
 PROG=$(basename "$0")
 TARGET="k10temp-pci-00c3"
 WARN_ICON="🔥"
+# MIN_TEMP=50
 MAX_TEMP=95
 NOTIFYID=888
 WARN_NOTIFIED="/tmp/${PROG}-high"
@@ -60,6 +61,10 @@ function _cpu_tempcore {
     temp_str=$(sensors "${TARGET}" | grep 'Tctl' | awk '{print $2}' | sed s/+//)
     temp_int=${temp_str%.*}
     icon=$(_get_icon "${temp_int}")
+
+    # local monitors
+    # monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+    # [[ "$temp_int" -le "$MIN_TEMP" && "$monitors" -eq 1 ]] && return
 
     if [[ "$temp_int" -ge "$MAX_TEMP" ]]; then
         _notify "${icon}${temp_str} is too high"

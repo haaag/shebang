@@ -3,22 +3,26 @@
 # script for managing brightness
 # dependency: brillo <https://gitlab.com/cameronnemo/brillo>
 
-PROG=$(basename "$0")
+PROG="${0##*/}"
 CMD="brillo"
-DEPS=("$CMD")
 
-function get_brightness {
+if ! command -v "$CMD" >/dev/null; then
+    echo "$PROG: '$CMD' command not found."
+    exit 1
+fi
+
+function _current {
     local current
     current=$("$CMD" -G)
     echo "${current%.*}"
 }
 
-function status_bar {
+function _statusbar {
     local icon low mid high brightness
     low=""
     mid=""
     high=""
-    brightness=$(get_brightness)
+    brightness=$(_current)
 
     if [[ "$brightness" -lt "30" ]]; then
         icon="$low"
@@ -28,18 +32,26 @@ function status_bar {
         icon="$high"
     fi
 
-    printf "%s" "$SEP1"
+    printf "%s" "${SEP1:-}"
     printf "%s %s\n" "$icon" "$brightness%"
-    printf "%s" "$SEP2"
+    printf "%s" "${SEP2:-}"
     exit 0
 }
 
-function get_notify_icon {
+function _notify_icon {
+    local low mid high
+    if [[ "${GLOBAL_THEME:-dark}" == "dark" ]]; then
+        high="brightness-high-symbolic"
+        low="brightness-low-symbolic"
+        mid="brightness-medium-symbolic"
+    else
+        high="display-brightness-symbolic"
+        low="display-brightness-symbolic"
+        mid="display-brightness-symbolic"
+    fi
+
     local brightness
-    local high=brightness-high-symbolic
-    local low=brightness-low-symbolic
-    local mid=brightness-medium-symbolic
-    brightness=$(get_brightness)
+    brightness=$(_current)
 
     if [[ "$brightness" -lt "30" ]]; then
         icon="$low"
@@ -52,24 +64,24 @@ function get_notify_icon {
     echo "${icon}"
 }
 
-function notify {
+function _notifyme {
     local brightness args
     declare -a args=(-a "Brightness" "Brightness" "Brightness")
-    args+=(-i "$(get_notify_icon)")
+    args+=(-i "$(_notify_icon)")
     args+=(-h string:x-canonical-private-synchronous:brightness)
-    args+=(-h int:value:"$(get_brightness)")
+    args+=(-h int:value:"$(_current)")
     notify-send "${args[@]}"
 }
 
-function increase {
+function _increase {
     "$CMD" -A "$1"
 }
 
-function decrease {
+function _decrease {
     "$CMD" -U "$1"
 }
 
-function usage {
+function _usage {
     cat <<-_EOF
 Usage: $PROG [INC|DEC] [VALUE]
 
@@ -88,24 +100,17 @@ function main {
     local option
     option="$1"
 
-    for cmd in "${DEPS[@]}"; do
-        if ! command -v "$cmd" >/dev/null; then
-            echo "$PROG: '$cmd' command not found."
-            exit 1
-        fi
-    done
-
     shift
 
     case "$option" in
-    -i | inc) increase "${1:-3}" ;;
-    -d | dec) decrease "${1:-3}" ;;
-    -s | status) status_bar ;;
-    -h | help | --help) usage ;;
-    *) status_bar ;;
+    -i | inc) _increase "${1:-3}" ;;
+    -d | dec) _decrease "${1:-3}" ;;
+    -s | status) _statusbar ;;
+    -h | help | --help) _usage ;;
+    *) _statusbar ;;
     esac
 
-    notify
+    _notifyme
 }
 
 main "$1" "$2"

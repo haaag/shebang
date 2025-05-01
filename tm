@@ -95,6 +95,7 @@ function _add_magnet {
 
 function _stop {
     pkill -f "$CMD"
+    pkill -RTMIN+12 dwmblocks
 }
 
 function _start {
@@ -114,6 +115,8 @@ function main {
     -x | tremc) tremc -X ;;
     *) tremc -X ;;
     esac
+
+    pkill -RTMIN+12 dwmblocks
 }
 
 main "$@"

@@ -6,10 +6,11 @@
 #  artist - track 00:00/00:00
 
 set -euo pipefail
-monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
-if [[ "$monitors" -eq 1 ]]; then
-    exit
-fi
+
+# monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
+# if [[ "$monitors" -eq 1 ]]; then
+#     exit
+# fi
 
 if [[ "${DWM_BAR_FILLED:-1}" -eq 0 ]]; then
     PLAYING=""
@@ -38,7 +39,7 @@ function _is_running {
 function _mpd_status {
     local status artist track
     status=$(mpc status | sed -n 2p | awk '{print $1;}')
-    if [[ "$status" = "[paused]" ]]; then
+    if [[ "$status" = "[paused]" || "$status" = "" ]]; then
         return
     else
         status=$PLAYING

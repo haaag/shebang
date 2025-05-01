@@ -8,7 +8,6 @@
 # output: "[ICON Fri, DD MMM]"
 #        󰭦 󰭨 
 
-
 if [ "${DWM_BAR_FILLED:-1}" -eq 0 ]; then
     ICON=" "
 else
@@ -16,7 +15,8 @@ else
 fi
 monitors=$(xrandr --query | grep -w 'connected' | awk '{print $1;}' | wc -l)
 if [ "$monitors" -eq 1 ]; then
-    d=$(date "+%d %b")
+    exit
+    # d=$(date "+%d %b")
 else
     d=$(date "+%a %d %b")
 fi

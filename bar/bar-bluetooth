@@ -37,7 +37,7 @@ if ! is_power_on; then
     exit
 fi
 
-function notify {
+function _notifyme {
     local msg="$1"
     local urgency="$2"
     local cmd="notify-send"
@@ -50,13 +50,13 @@ function notify {
     "$cmd" -h string:x-dunst-stack-tag:bluetooth -i "battery-low-symbolic" -u "$urgency" "$PROG" "$msg"
 }
 
-function check_battery {
+function _check_battery {
     local device_alias="$1"
     local battery="$2"
     if [[ "$battery" -le 10 ]] && [[ "$battery" != "" ]]; then
         msg="$device_alias battery is low ${warn} ${icon_critical}${battery}%"
         echo "$msg" | tee -a "$LOGGER"
-        notify "$msg" "critical"
+        _notifyme "$msg" "critical"
     fi
 }
 
@@ -141,7 +141,7 @@ function devices_status {
                 continue
             fi
 
-            check_battery "$device_alias" "$battery"
+            _check_battery "$device_alias" "$battery"
             bat_icon=$(get_battery_icon "$battery")
             device_icon=$(get_device_icon "$device")
 
