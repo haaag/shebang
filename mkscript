@@ -16,6 +16,11 @@ _EOF
     exit 1
 }
 
+[[ -f "$1" ]] && {
+    echo "${0##*/}: file '$1' already exists"
+    exit 130
+}
+
 SHEBANG="#!/usr/bin/env bash"
 declare -a OPTS=("set -o errexit" "set -o nounset")
 
